@@ -1,0 +1,82 @@
+lib/
+├── models/
+│ ├── auth/
+│ ├── whatsapp/
+│ ├── instagram/
+│ ├── facebook/
+│ ├── home_control/
+│ ├── vault/
+│ ├── trust_me/
+│ ├── guptik/
+│ ├── security/
+│ └── shared/
+├── screens/
+│ ├── auth/
+│ ├── dashboard/
+│ ├── whatsapp/
+│ ├── instagram/
+│ ├── facebook/
+│ ├── home_control/
+│ ├── vault/
+│ ├── trust_me/
+│ ├── guptik/
+│ └── security/
+├── services/
+│ ├── api/
+│ ├── whatsapp/
+│ ├── instagram/
+| ├── facebook/
+│ ├── home_control/
+│ ├── vault/
+│ ├── trust_me/
+│ ├── guptik/
+│ └── security/
+├── widgets/
+│ ├── common/
+│ ├── whatsapp/
+│ ├── facebook/
+│ ├── instagram/
+│ ├── home_control/
+│ ├── vault/
+│ ├── trust_me/
+│ ├── guptik/
+│ ├── security/
+│ └── layouts/
+├── popups/
+├── assets/
+└── utils/
+
+whatsapp = full whatsapp developer features
+    whatsapp templates, bulk messaging (own data tables and upload xlsx or any other), messages.
+facebook = full facebook developer features
+    messages, posting, stories, comments, user/page
+instagram = full instagram developer features
+    messages, posting, stories, comments
+home_control = this is a our own platform - upgraded version of smart home
+    we have already developed a flutter application we will be migrating it here
+    still you can give me the file structure for this also.
+    smart switches control, back end tables are users, homes,shared homes(with different users), rooms, switch boards, switches, whater monetring of home, gates, fan regulaters in switches, cameras, door locks
+    we have fearure plans of integrating a raling system robo arm
+    game theme UI
+vault = this is a our own platform - compleate local srorage
+    this will be connected to home server
+    the captured and stored data in the mobile can sent here if mobile is out of storage
+    a replacement for all cloud storages
+    just a setup page and veiw pages
+    sync option
+trust_me = this is a our own platform - upgraded version of messaging platforms
+    in this user connect the mobile to the home application of ours(where databases are created by defualt,), so all the messages data is stored within users databases
+    for this both the reciver and sender must have this platform up and running
+    they the share their unique user link or scan qr so both the parties are connected.
+    same whatsapp messaging UI and features but own data bases.
+    modred classic cybersecurity UI
+guptik = this is a our own platform - ai agent
+    for this user must connect to the desktop/server application
+    this will be connected all the data form whatsapp, facebook, instagram, home_control, vault, security and real time web/internet, but not trust_me. 
+    users can pull their desired models from ollama and hugging face at the time of installation, and can select, talk wiht models in the application.
+security =  this is a our own platform - upgraded plartform for cybersecurity
+    for this user must connect to the desktop/server application
+    this will be connected all the data form whatsapp, facebook, instagram, in_coming calls/messages on mobile track location and details
+    user can setup the feature at the time of installing desktop application, and check the logs\details here.
+
+there might and will be future upgrades
