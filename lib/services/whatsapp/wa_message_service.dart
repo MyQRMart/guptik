@@ -59,15 +59,6 @@ class MessageService {
     }
   }
 
-  // Get user ID
-  String get _userId {
-    final user = _supabase.auth.currentUser;
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
-    return user.id;
-  }
-
   // Get WhatsApp credentials
   Future<Map<String, dynamic>?> _getWhatsAppCredentials() async {
     try {
