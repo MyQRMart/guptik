@@ -13,7 +13,7 @@ class Message {
   final DateTime? statusTimestamp;
   final String? templateId;
   final Map<String, dynamic>? mediaInfo;
-  final Map<String, dynamic>? rawData;
+  final dynamic rawData; // Changed to dynamic to handle flexible parsing
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -43,85 +43,60 @@ class Message {
       messageType: json['message_type']?.toString() ?? 'text',
       direction: json['direction']?.toString() ?? '',
       status: json['status']?.toString(),
-      
-      // FIXED: Proper timestamp parsing
       timestamp: _parseDateTime(json['timestamp']),
-      
       statusTimestamp: json['status_timestamp'] != null
           ? _parseDateTime(json['status_timestamp'])
           : null,
       templateId: json['template_id']?.toString(),
       
-      // Use the helper method
-      mediaInfo: _parseJsonField(json['media_info']),
-      rawData: _parseJsonField(json['raw_data']),
+      // FIXED: Robust parsing for media_info
+      mediaInfo: _parseMediaInfo(json['media_info']),
       
-      // FIXED: Proper parsing for created/updated at
+      rawData: json['raw_data'],
       createdAt: _parseDateTime(json['created_at']),
       updatedAt: _parseDateTime(json['updated_at']),
     );
   }
 
-  // Helper method to parse dates with timezone handling
-  static DateTime _parseDateTime(dynamic value) {
-    if (value == null) return DateTime.now().toLocal();
-    
-    try {
-      String dateString = value.toString().trim();
-      
-      // Debug log
-      if (kDebugMode) {
-        print('Parsing date: $dateString');
-      }
-      
-      // If it doesn't have timezone, check format
-      if (!dateString.endsWith('Z') && 
-          !dateString.contains('+') && 
-          !dateString.contains('-') &&
-          !dateString.contains(' ')) {
-        // It might be in format like "2024-01-01T12:00:00" without timezone
-        // Add UTC timezone
-        dateString = '${dateString}Z';
-      }
-      
-      // Parse the date
-      DateTime parsedDate = DateTime.parse(dateString);
-      
-      // Convert to local time
-      return parsedDate.toLocal();
-      
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error parsing date $value: $e');
-      }
-      return DateTime.now().toLocal();
-    }
-  }
-
-  // Helper method to parse JSON fields
-  static Map<String, dynamic>? _parseJsonField(dynamic field) {
+  // FIXED: Handle cases where media_info is a string (MimeType) or a Map
+  static Map<String, dynamic>? _parseMediaInfo(dynamic field) {
     if (field == null) return null;
     
-    // If it's already a Map
     if (field is Map) {
       return Map<String, dynamic>.from(field);
     }
     
-    // If it's a String, try to parse it as JSON
     if (field is String) {
       try {
+        // Try decoding as JSON map
         final parsed = json.decode(field);
         if (parsed is Map) {
           return Map<String, dynamic>.from(parsed);
         }
+        // If it decodes to a string (double encoded) or isn't a map
+        return {'mime_type': parsed.toString()}; 
       } catch (e) {
-        if (kDebugMode) {
-          print('Failed to parse JSON field: $e');
-        }
+        // If it's just a plain string (e.g. "image/jpeg"), treat it as mime_type
+        return {'mime_type': field};
       }
     }
-    
     return null;
+  }
+
+  // Helper method to parse dates with timezone handling
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now().toLocal();
+    try {
+      String dateString = value.toString().trim();
+      if (!dateString.endsWith('Z') && 
+          !dateString.contains('+') && 
+          !dateString.contains('-')) {
+        dateString = '${dateString}Z';
+      }
+      return DateTime.parse(dateString).toLocal();
+    } catch (e) {
+      return DateTime.now().toLocal();
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -186,6 +161,7 @@ class Message {
   bool get isIncoming => direction == 'incoming';
   bool get isOutgoing => direction == 'outgoing';
   bool get isAiOutgoing => direction == 'ai_outgoing';
+  
   bool get isSent => status == 'sent';
   bool get isDelivered => status == 'delivered';
   bool get isRead => status == 'read';
@@ -206,41 +182,38 @@ class Message {
   bool get isSticker => messageType == 'sticker';
   bool get isReaction => messageType == 'reaction';
 
-  // Get media URL if available
+  String? get fileName => mediaInfo?['filename']?.toString() ?? mediaInfo?['name']?.toString();
+  String? get fileSize => mediaInfo?['filesize']?.toString() ?? mediaInfo?['size']?.toString();
+  String? get mimeType => mediaInfo?['mime_type']?.toString() ?? mediaInfo?['type']?.toString();
+
+  // Get media URL with fallbacks (Unified version)
   String? get mediaUrl {
-    if (mediaInfo == null) return null;
-    return mediaInfo!['url']?.toString() ?? 
-           mediaInfo!['link']?.toString() ?? 
-           mediaInfo!['media_url']?.toString();
-  }
+    // 1. Check media_info for explicit URL
+    if (mediaInfo != null) {
+      final url = mediaInfo!['url']?.toString() ?? 
+                  mediaInfo!['link']?.toString() ?? 
+                  mediaInfo!['media_url']?.toString();
+      if (url != null && url.isNotEmpty) return url;
+    }
 
-  // Get file name for documents
-  String? get fileName {
-    if (mediaInfo == null) return null;
-    return mediaInfo!['filename']?.toString() ?? 
-           mediaInfo!['name']?.toString();
-  }
+    // 2. Fallback: If content looks like a URL, use it
+    if (content.startsWith('http')) {
+      return content;
+    }
 
-  // Get file size for documents/media
-  String? get fileSize {
-    if (mediaInfo == null) return null;
-    return mediaInfo!['filesize']?.toString() ?? 
-           mediaInfo!['size']?.toString();
-  }
+    // 3. Fallback: Check raw_data if it contains a URL string
+    if (rawData != null && rawData.toString().startsWith('http')) {
+       // Handle cases like "\"https://...\""
+       return rawData.toString().replaceAll('"', '');
+    }
 
-  // Get mime type
-  String? get mimeType {
-    if (mediaInfo == null) return null;
-    return mediaInfo!['mime_type']?.toString() ?? 
-           mediaInfo!['type']?.toString();
+    return null;
   }
 
   // ========== TIME FORMATTING METHODS ==========
   
   // Get formatted time (e.g., "14:30")
-  String get formattedTime {
-    return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-  }
+  String get formattedTime => '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
   
   // Get formatted time with AM/PM (e.g., "2:30 PM")
   String get formattedTime12Hour {

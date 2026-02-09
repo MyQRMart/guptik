@@ -5,11 +5,61 @@ import 'package:flutter/material.dart';
 import 'package:guptik/models/whatsapp/wa_message.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
+// THIS IS THE MISSING IMPORT
+import 'package:path_provider/path_provider.dart'; 
 
 class MessageService {
   final SupabaseClient _supabase = Supabase.instance.client;
   
-  // Get user ID - FIXED: Handle null case properly
+  // Cache for token to avoid fetching on every image load
+  String? _cachedAccessToken;
+  DateTime? _tokenExpiry;
+
+  // NEW: Get Access Token for Media Display
+  Future<String?> getAccessToken() async {
+    // Return cached token if valid (simple cache mechanism)
+    if (_cachedAccessToken != null && _tokenExpiry != null && DateTime.now().isBefore(_tokenExpiry!)) {
+      return _cachedAccessToken;
+    }
+
+    final creds = await _getWhatsAppCredentials();
+    if (creds != null) {
+      _cachedAccessToken = creds['access_token'];
+      _tokenExpiry = DateTime.now().add(const Duration(minutes: 50));
+      return _cachedAccessToken;
+    }
+    return null;
+  }
+
+  // NEW: Helper to download authenticated media (Video/Audio/Docs)
+  Future<File?> downloadAuthenticatedMedia(String url, String fileName) async {
+    try {
+      final token = await getAccessToken();
+      if (token == null) return null;
+
+      final headers = {
+        'Authorization': 'Bearer $token',
+      };
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+      
+      if (response.statusCode == 200) {
+        // Now this will work because path_provider is imported
+        final dir = await getTemporaryDirectory(); 
+        final file = File('${dir.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes);
+        return file;
+      } else {
+        debugPrint('Failed to download media: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Error downloading media: $e');
+      return null;
+    }
+  }
+
+  // Get user ID
   String get _userId {
     final user = _supabase.auth.currentUser;
     if (user == null) {
@@ -71,7 +121,7 @@ class MessageService {
     }
   }
 
-  // Send text message - FIXED: Handle userId properly
+  // Send text message
   Future<Message> sendTextMessage({
     required String conversationId,
     required String content,
@@ -186,17 +236,13 @@ class MessageService {
         },
       };
 
-      debugPrint('Sending to WhatsApp API...');
       final response = await http.post(
         url,
         headers: headers,
         body: json.encode(requestBody),
       );
 
-      debugPrint('WhatsApp Response: ${response.statusCode}');
-
       if (response.statusCode == 200) {
-        debugPrint('WhatsApp message sent successfully');
         return true;
       } else {
         debugPrint('WhatsApp API Error: ${response.body}');
@@ -235,8 +281,6 @@ class MessageService {
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
-      debugPrint('Upload Response: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final responseData = json.decode(responseBody);
         
@@ -253,8 +297,6 @@ class MessageService {
           final mediaUrl = fileData['url']?.toString() ?? 
                           fileData['browserUrl']?.toString() ??
                           'https://uploadservice.myqrmart.com/u/${fileData['filename']}';
-          
-          debugPrint('Upload successful: $mediaUrl');
           
           return {
             'success': true,
@@ -275,7 +317,7 @@ class MessageService {
     }
   }
 
-  // Send media message - FIXED: Handle userId properly
+  // Send media message
   Future<Message> sendMediaMessage({
     required String conversationId,
     required String mediaUrl,
@@ -351,9 +393,9 @@ class MessageService {
           .eq('message_id', messageId);
 
       // 4. Update conversation
-      final displayMessage = messageType == 'image' ? '📷 Photo' : 
-                           messageType == 'video' ? '🎬 Video' : 
-                           messageType == 'audio' ? '🎵 Audio' : 
+      final displayMessage = messageType == 'image' ? '📸 Photo' : 
+                           messageType == 'video' ? '🎥 Video' : 
+                           messageType == 'audio' ? '🎤 Audio' : 
                            '📎 Media';
       
       await _updateConversationLastMessage(conversationId, displayMessage);
@@ -420,17 +462,13 @@ class MessageService {
         };
       }
 
-      debugPrint('Sending media to WhatsApp API...');
       final response = await http.post(
         url,
         headers: headers,
         body: json.encode(requestBody),
       );
 
-      debugPrint('WhatsApp Media Response: ${response.statusCode}');
-
       if (response.statusCode == 200) {
-        debugPrint('Media sent to WhatsApp successfully');
         return true;
       } else {
         debugPrint('WhatsApp Media API Error: ${response.body}');
@@ -479,9 +517,8 @@ class MessageService {
     }
   }
 
-  // Subscribe to messages stream (SIMPLIFIED)
+  // Subscribe to messages stream
   Stream<List<Message>> subscribeToMessages(String conversationId) {
-    // Return a simple stream from future
     return Stream.fromFuture(getMessages(conversationId));
   }
 
@@ -515,6 +552,7 @@ class MessageService {
     }
   }
 
+
   // Check if WhatsApp is configured
   Future<bool> hasWhatsAppConfigured() async {
     final credentials = await _getWhatsAppCredentials();
@@ -523,7 +561,8 @@ class MessageService {
            credentials['phone_number_id'] != null;
   }
 
-  // Retry failed message
+   
+    // Retry failed message
   Future<void> retryFailedMessage(String messageId) async {
     debugPrint('Retry message $messageId - Feature not implemented yet');
   }

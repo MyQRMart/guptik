@@ -3,6 +3,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:guptik/models/whatsapp/wa_conversation.dart';
 import 'package:guptik/screens/dashboard/flows_screen.dart';
 import 'package:guptik/screens/dashboard/message_templates_screen.dart';
+import 'package:guptik/screens/guptik/guptik_screen.dart';
+import 'package:guptik/screens/home_control/homecontrol_screen.dart';
+import 'package:guptik/screens/security/security_screen.dart';
+import 'package:guptik/screens/trust_me/trust_me_screen.dart';
+import 'package:guptik/screens/vault/vaultscreen.dart';
 import 'package:guptik/services/dashboard/whatsapp_business_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:guptik/screens/dashboard/quick_replies_screen.dart';
@@ -1565,160 +1570,429 @@ class _HomeScreenState extends State<HomeScreen> {
           
           // Social Media Icons Row
           Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'Connect with us',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+  padding: const EdgeInsets.all(20),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(12),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.grey.withValues(alpha: 0.1),
+        blurRadius: 8,
+        offset: const Offset(0, 2),
+      ),
+    ],
+  ),
+  child: Column(
+    children: [
+      const Text(
+        'Connect with us',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 8),
+      const Text(
+        'social media platforms',
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.grey,
+        ),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 20),
+
+      // FIRST ROW - WhatsApp, Facebook, Instagram
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // WhatsApp Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const Whatsapp(),
                   ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green[100]!),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'social media platforms ',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                  textAlign: TextAlign.center
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // WhatsApp Icon
-                    InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const Whatsapp(),
-                          ),
-                       
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green[100]!),
-                        ),
-                        child: const Column(
-                          children: [
-                           FaIcon(
-                            FontAwesomeIcons.whatsapp,
-                            color: Colors.green,
-                             size: 30,
-                                ),
-                            SizedBox(height: 8),
-                            Text(
-                              'WhatsApp',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.green,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    FaIcon(
+                      FontAwesomeIcons.whatsapp,
+                      color: Colors.green,
+                      size: 28,
                     ),
-                    
-                    const SizedBox(width: 20),
-                    
-                    // Facebook Icon
-                    InkWell(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Opening Facebook...'),
-                            backgroundColor: Colors.blue,
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.blue[100]!),
-                        ),
-                        child: const Column(
-                          children: [
-                            FaIcon(
-                                 FontAwesomeIcons.facebook,
-                                    color: Colors.blue,
-                                     size: 30,
-                                     ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Facebook',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                    SizedBox(height: 6),
+                    Text(
+                      'WhatsApp',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    
-                    const SizedBox(width: 20),
-                    
-                    // Instagram Icon
-                    InkWell(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Opening Instagram...'),
-                            backgroundColor: Colors.pink,
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.pink[50],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.pink[100]!),
-                        ),
-                        child: const Column(
-                          children: [
-                            FaIcon(
-                                 FontAwesomeIcons.instagram,
-                                    color: Colors.pink,
-                                     size: 30,
-                                     ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Instagram',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.pink,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 40),
+          const SizedBox(width: 10),
+
+          // Facebook Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Opening Facebook...'),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue[100]!),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaIcon(
+                      FontAwesomeIcons.facebook,
+                      color: Colors.blue,
+                      size: 28,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Facebook',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // Instagram Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Opening Instagram...'),
+                    backgroundColor: Colors.pink,
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.pink[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.pink[100]!),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaIcon(
+                      FontAwesomeIcons.instagram,
+                      color: Colors.pink,
+                      size: 28,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Instagram',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.pink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 20),
+
+      // SECOND ROW - Homecontrol, Vault, Trust Me
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Homecontrol Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HomecontrolScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.teal[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.teal[100]!),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaIcon(
+                      FontAwesomeIcons.house,
+                      color: Colors.teal,
+                      size: 28,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Homecontrol',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.teal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // Vault Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const Vaultscreen(),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blueGrey[100]!),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaIcon(
+                      FontAwesomeIcons.vault,
+                      color: Colors.blueGrey,
+                      size: 28,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Vault',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blueGrey,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+                    // Trust Me Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TrustMeScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(255, 229, 197, 234),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Color.fromARGB(255, 213, 211, 213)),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaIcon(
+                      FontAwesomeIcons.solidHandshake,
+                      color: Color.fromARGB(255, 115, 11, 134),
+                      size: 28,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Trust Me',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color.fromARGB(255, 136, 43, 153),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 20),
+
+    // THIRD ROW - Security, Guptik (with empty space for equal layout)
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Security Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SecurityScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color.fromARGB(201, 202, 215, 14)),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaIcon(
+                      FontAwesomeIcons.shieldHalved,
+                      color: Color.fromARGB(201, 202, 215, 14),
+                      size: 28,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Security',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color.fromARGB(201, 202, 215, 14),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // Guptik Icon
+          Flexible(
+            fit: FlexFit.tight,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const GuptikScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(200, 248, 249, 245),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color.fromARGB(200, 9, 158, 76)),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaIcon(
+                      FontAwesomeIcons.personSnowboarding,
+                      color: Color.fromARGB(200, 9, 158, 76),
+                      size: 28,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'GupTik',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color.fromARGB(200, 9, 158, 76),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+           ],
+      ),
+            ],
+  ),
+),
+
+      const SizedBox(height: 40),
 
           // Business Account Status (LIVE DATA)
           Container(
