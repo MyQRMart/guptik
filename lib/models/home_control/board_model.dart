@@ -26,6 +26,7 @@ class Board {
   });
 
   factory Board.fromJson(Map<String, dynamic> json) {
+    final switchesList = json['hc_switches'];
     return Board(
       id: json['id'],
       ownerId: json['owner_id'],
@@ -38,7 +39,7 @@ class Board {
       macAddress: json['mac_address'],
       lastOnline: json['last_online'] != null ? DateTime.parse(json['last_online']) : null,
       isActive: json['is_active'] ?? true,
-      switches: (json['switches'] as List?)?.map((s) => SwitchDevice.fromJson(s)).toList() ?? [],
+      switches: (switchesList as List?)?.map((s) => SwitchDevice.fromJson(s)).toList() ?? [],
     );
   }
 

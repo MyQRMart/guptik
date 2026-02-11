@@ -44,6 +44,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
       }
 
       // Load rooms from the specific home with their associated boards
+      // Note: We select 'hc_boards' which is the table name for the relation
       final response = await _supabase
           .from('hc_rooms')
           .select('*, hc_boards(*)')
@@ -530,6 +531,8 @@ class _RoomListScreenState extends State<RoomListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // We use Consumer here to get the theme settings
+    // Crucially, we also grab the 'themeProvider' instance itself to pass it down
     return Consumer<DynamicThemeProvider>(
       builder: (context, themeProvider, child) {
         final isBasicTheme = themeProvider.backgroundType == 'basic';
@@ -555,15 +558,14 @@ class _RoomListScreenState extends State<RoomListScreen> {
                   color: isBasicTheme ? null : Colors.white,
                 ),
                 onPressed: () {
-                  // FIX: Capture the provider and pass it to the new route
-                  final provider = Provider.of<DynamicThemeProvider>(context, listen: false);
-                  
+                  // FIX: Use the 'themeProvider' instance directly from the Consumer
+                  // This avoids any 'ProviderNotFoundException' from context lookups
                   Navigator.push(
                     context,
                     PageRouteBuilder(
                       pageBuilder: (context, animation, secondaryAnimation) {
                         return ChangeNotifierProvider.value(
-                          value: provider, // Pass the existing provider
+                          value: themeProvider, // <--- DIRECT PASS
                           child: DynamicBackgroundWidget(
                             child: BoardListScreen(
                               homeName: widget.homeName,
@@ -606,7 +608,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
                         size: 64,
                         color: isBasicTheme
                             ? (isDark ? Colors.white70 : Colors.black54)
-                            : Colors.white.withOpacity(0.7),
+                            : Colors.white.withValues(alpha: 0.7),
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -623,7 +625,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
                         style: TextStyle(
                           color: isBasicTheme
                               ? (isDark ? Colors.white70 : Colors.black54)
-                              : Colors.white.withOpacity(0.8),
+                              : Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -644,7 +646,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
                       tag: 'room-${room.id}',
                       child: Card(
                         elevation: 8,
-                        shadowColor: Colors.black.withOpacity(0.3),
+                        shadowColor: Colors.black.withValues(alpha: 0.3),
                         clipBehavior: Clip.hardEdge,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -654,12 +656,12 @@ class _RoomListScreenState extends State<RoomListScreen> {
                             gradient: LinearGradient(
                               colors: isDark
                                   ? [
-                                      Colors.grey[800]!.withOpacity(0.9),
-                                      Colors.grey[900]!.withOpacity(0.9),
+                                      Colors.grey[800]!.withValues(alpha: 0.9),
+                                      Colors.grey[900]!.withValues(alpha: 0.9),
                                     ]
                                   : [
-                                      Colors.white.withOpacity(0.9),
-                                      Colors.grey[100]!.withOpacity(0.9),
+                                      Colors.white.withValues(alpha: 0.9),
+                                      Colors.grey[100]!.withValues(alpha: 0.9),
                                     ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -668,16 +670,14 @@ class _RoomListScreenState extends State<RoomListScreen> {
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
                             onTap: () {
-                              // FIX: Capture the provider and pass it to the new route
-                              final provider = Provider.of<DynamicThemeProvider>(context, listen: false);
-
+                              // FIX: Use the 'themeProvider' instance directly from the Consumer
                               Navigator.push(
                                 context,
                                 PageRouteBuilder(
                                   pageBuilder:
                                       (context, animation, secondaryAnimation) {
                                         return ChangeNotifierProvider.value(
-                                          value: provider, // Pass the existing provider
+                                          value: themeProvider, // <--- DIRECT PASS
                                           child: DynamicBackgroundWidget(
                                             child: BoardListScreen(
                                               homeName: widget.homeName,
@@ -712,12 +712,9 @@ class _RoomListScreenState extends State<RoomListScreen> {
                                       Container(
                                         decoration: BoxDecoration(
                                           color: isDark
-                                              ? Colors.grey[800]!.withOpacity(
-                                                  0.5,
-                                                )
-                                              : Colors.grey[200]!.withOpacity(
-                                                  0.5,
-                                                ),
+                                              ? Colors.grey[800]!.withValues(alpha: 0.5)
+                                              : Colors.grey[200]!.withValues(alpha: 0.5),
+
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
@@ -761,9 +758,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.3,
-                                              ),
+                                              color: Colors.black.withValues(alpha: 0.3),
                                               blurRadius: 8,
                                               offset: const Offset(0, 4),
                                             ),
@@ -823,8 +818,8 @@ class _RoomListScreenState extends State<RoomListScreen> {
             icon: const Icon(Icons.add),
             label: const Text('Add Room'),
             backgroundColor: isDark
-                ? Colors.white.withOpacity(0.2)
-                : Colors.blue.withOpacity(0.8),
+                ? Colors.white.withValues(alpha: 0.2)
+                : Colors.blue.withValues(alpha: 0.8),
             foregroundColor: Colors.white,
             elevation: 8,
           ),

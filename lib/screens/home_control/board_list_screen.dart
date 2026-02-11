@@ -28,7 +28,7 @@ class _BoardListScreenState extends State<BoardListScreen> {
   }
 
   Future<void> _loadBoards() async {
-    final res = await _supabase.from('hc_boards').select('*, switches(*)').eq('home_id', widget.homeId);
+    final res = await _supabase.from('hc_boards').select('*, hc_switches(*)').eq('home_id', widget.homeId);
     if(mounted) setState(() {
       _boards = (res as List).map((e) => Board.fromJson(e)).toList();
       _isLoading = false;
@@ -81,7 +81,10 @@ class _BoardListScreenState extends State<BoardListScreen> {
           itemBuilder: (context, index) {
             final board = _boards[index];
             return GlassCard(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SwitchControlScreen(boardId: board.id, boardName: board.name))),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(
+                value: theme,
+                child: SwitchControlScreen(boardId: board.id, boardName: board.name),
+              ))),
               child: ListTile(
                 leading: Icon(Icons.developer_board, color: board.status == BoardStatus.online ? Colors.green : Colors.red),
                 title: Text(board.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -94,7 +97,7 @@ class _BoardListScreenState extends State<BoardListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddBoardDialog,
-        backgroundColor: Colors.white.withOpacity(0.2),
+        backgroundColor: Colors.white.withValues(alpha: 0.2),
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

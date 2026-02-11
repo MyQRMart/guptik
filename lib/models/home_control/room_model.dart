@@ -28,25 +28,33 @@ class Room {
   });
 
   factory Room.fromJson(Map<String, dynamic> json) {
-    // Supabase returns relations using the table name (e.g., 'hc_boards')
-    // We check both keys to be safe.
-    final boardsList = json['boards'] ?? json['hc_boards'];
+    // CRITICAL FIX: Supabase returns relations using the table name 'hc_boards'.
+    // We check for 'hc_boards' first, then fallback to 'boards'.
+    var rawBoards = json['hc_boards'] ?? json['boards'];
+
+    List<Board> parsedBoards = [];
+    if (rawBoards != null && rawBoards is List) {
+      parsedBoards = rawBoards
+          .map((b) => Board.fromJson(b as Map<String, dynamic>))
+          .toList();
+    }
 
     return Room(
-      id: json['id'],
-      homeId: json['home_id'],
-      name: json['name'],
-      description: json['description'],
-      icon: json['icon'],
-      displayOrder: json['display_order'],
+      id: json['id'] as String,
+      homeId: json['home_id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      icon: json['icon'] as String?,
+      displayOrder: json['display_order'] as int?,
       metadata: json['metadata'] as Map<String, dynamic>?,
       isActive: json['is_active'] ?? true,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
-      boards: (boardsList as List?)
-              ?.map((board) => Board.fromJson(board))
-              .toList() ??
-          [],
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at']) 
+          : null,
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at']) 
+          : null,
+      boards: parsedBoards,
     );
   }
 
@@ -62,7 +70,8 @@ class Room {
       'is_active': isActive,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
-      'boards': boards.map((board) => board.toJson()).toList(),
+      // We map this back to 'boards' for local use, or 'hc_boards' if sending to API (though usually not needed for updates)
+      'boards': boards.map((b) => b.toJson()).toList(),
     };
   }
 

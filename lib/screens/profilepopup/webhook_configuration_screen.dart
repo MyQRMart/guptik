@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:guptik/screens/profilepopup/webhook_server.dart';
+import 'package:guptik/screens/profilepopup/desktop_pairing_screen.dart';
 
 
 class WebhookConfigurationScreen extends StatefulWidget {
@@ -163,6 +164,18 @@ class _WebhookConfigurationScreenState extends State<WebhookConfigurationScreen>
                       ],
                     ),
                     const SizedBox(height: 8),
+                    // Inside your Column in build() method, near the Webhook URL Configuration card:
+                    ListTile(
+                      title: const Text("Desktop Device Pairing"),
+                      subtitle: const Text("Connect your mobile to your local desktop server"),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const DesktopPairingScreen()),
+                        );
+                      },
+                    ),
                     Text(
                       'Configure webhooks to receive real-time updates from WhatsApp Business API including message delivery status, incoming messages, and template approvals.',
                       style: TextStyle(
