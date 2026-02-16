@@ -67,20 +67,20 @@ class MessageService {
 
       final response = await _supabase
           .from('user_api_settings')
-          .select('whatsapp_access_token, phone_number_id, mobile_number')
+          .select('whatsapp_access_token, meta_wa_phone_number_id, mobile_number')
           .eq('user_id', userId)
           .maybeSingle();
 
       if (response == null || 
           response['whatsapp_access_token'] == null || 
-          response['phone_number_id'] == null) {
+          response['meta_wa_phone_number_id'] == null) {
         debugPrint('Missing WhatsApp credentials');
         return null;
       }
 
       return {
         'access_token': response['whatsapp_access_token'],
-        'phone_number_id': response['phone_number_id'],
+        'phone_number_id': response['meta_wa_phone_number_id'],
         'mobile_number': response['mobile_number'] ?? '',
       };
     } catch (e) {

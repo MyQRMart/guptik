@@ -41,6 +41,10 @@ dependencies:
   # Location & Wifi
   geolocator: ^10.1.0
   wifi_scan: ^0.4.0+2
+  photo_manager: ^3.0.0
+  transparent_image: ^2.0.0
+  share_plus: ^10.0.0
+
 
 dev_dependencies:
   flutter_test:

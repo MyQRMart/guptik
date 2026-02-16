@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:guptik/models/whatsapp/wa_conversation.dart';
 import 'package:guptik/screens/dashboard/flows_screen.dart';
 import 'package:guptik/screens/dashboard/message_templates_screen.dart';
+import 'package:guptik/screens/facebook/fb_and_insta_screen.dart';
 import 'package:guptik/screens/guptik/guptik_screen.dart';
 import 'package:guptik/screens/home_control/homecontrol_screen.dart';
 import 'package:guptik/screens/security/security_screen.dart';
@@ -583,7 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Menu Items
                 _buildProfileMenuItem(Icons.person_outline, 'My Account'),
                 _buildProfileMenuItem(Icons.phone_android, 'WhatsApp Numbers'),
-                _buildProfileMenuItem(Icons.subscriptions, 'My Subscriptions'),
+                _buildProfileMenuItem(Icons.facebook, 'Facebook & Instagram'),
                 
                 const Divider(height: 1),
                 
@@ -647,8 +648,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'WhatsApp Numbers':
         Navigator.pushNamed(context, '/whatsapp-numbers');
         break;
-      case 'My Subscriptions':
-        Navigator.pushNamed(context, '/subscriptions');
+      case 'Facebook & Instagram':
+        Navigator.pushNamed(context, '/facebook-instagram');
         break;
       case 'API Configuration':
         Navigator.pushNamed(context, '/api-settings');
@@ -1604,147 +1605,122 @@ class _HomeScreenState extends State<HomeScreen> {
       const SizedBox(height: 20),
 
       // FIRST ROW - WhatsApp, Facebook, Instagram
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // WhatsApp Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const Whatsapp(),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green[100]!),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FaIcon(
-                      FontAwesomeIcons.whatsapp,
-                      color: Colors.green,
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'WhatsApp',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+Row(
+  children: [
+    // -------------------------
+    // 1. WhatsApp Button
+    // -------------------------
+    Expanded(
+      child: InkWell(
+        onTap: () {
+         Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const Whatsapp(),
+        ),
+      );
+         },
+        
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.green[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green[100]!),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FaIcon(FontAwesomeIcons.whatsapp, color: Colors.green, size: 28),
+              SizedBox(height: 8),
+              Text(
+                'WhatsApp',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
+            ],
           ),
-
-          const SizedBox(width: 10),
-
-          // Facebook Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Opening Facebook...'),
-                    backgroundColor: Colors.blue,
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue[100]!),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FaIcon(
-                      FontAwesomeIcons.facebook,
-                      color: Colors.blue,
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Facebook',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          // Instagram Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Opening Instagram...'),
-                    backgroundColor: Colors.pink,
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.pink[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.pink[100]!),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FaIcon(
-                      FontAwesomeIcons.instagram,
-                      color: Colors.pink,
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Instagram',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.pink,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
+    ),
 
+    const SizedBox(width: 12),
+
+    // -------------------------
+    // 2. Combined Meta Button (Facebook & Instagram)
+    // -------------------------
+    Expanded(
+      child: InkWell(
+        onTap: () {
+          // ONE ACTION: Opens the combined Meta/Social page
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const FbAndInstaScreen(),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F0FE), // Light Indigo/Blue background for Meta feel
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFD2E3FC)),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // FACEBOOK PART (Icon + Text)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FaIcon(FontAwesomeIcons.facebook, color: Color(0xFF1877F2), size: 28),
+                  SizedBox(height: 8),
+                  Text(
+                    'Facebook',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF1877F2), // Facebook Blue Text
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Small vertical line to separate them visually (Optional)
+              SizedBox(
+                height: 30,
+                child: VerticalDivider(color: Colors.grey, thickness: 0.5),
+              ),
+
+              // INSTAGRAM PART (Icon + Text)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FaIcon(FontAwesomeIcons.instagram, color: Color(0xFFE1306C), size: 28),
+                  SizedBox(height: 8),
+                  Text(
+                    'Instagram',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFE1306C), // Instagram Pink Text
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  ],
+),
       const SizedBox(height: 20),
 
       // SECOND ROW - Homecontrol, Vault, Trust Me
@@ -1806,7 +1782,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const Vaultscreen(),
+                    builder: (context) => const VaultScreen(),
                   ),
                 );
               },

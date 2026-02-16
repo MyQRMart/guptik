@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -9,29 +10,92 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _statusController = TextEditingController();
+  
+  // Loading state to disable the save button while saving
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Load user data from service/database
     _loadUserProfile();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
-    _statusController.dispose();
     super.dispose();
   }
 
+  // --- 1. LOAD DATA FROM SUPABASE ---
   void _loadUserProfile() {
-    // Load user data from Supabase user profile
-    // Controllers will be populated when authentication service provides user data
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      setState(() {
+        // Load Name from 'user_metadata' (JSON)
+        _nameController.text = user.userMetadata?['full_name'] ?? '';
+        
+        // Load Phone from the core Auth table
+        _phoneController.text = user.phone ?? '';
+      });
+    }
+  }
+
+  // --- 2. SAVE DATA TO SUPABASE ---
+  Future<void> _saveProfile() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final name = _nameController.text.trim();
+      final phone = _phoneController.text.trim();
+
+      // Updates strictly authentication details (Phone) and metadata (Name)
+      final updates = UserAttributes(
+        // Update the core phone column
+        phone: phone.isNotEmpty ? phone : null,
+        // Update the custom metadata JSON
+        data: {
+          'full_name': name, 
+        },
+      );
+
+      await Supabase.instance.client.auth.updateUser(updates);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Profile updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An unexpected error occurred'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -42,13 +106,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: const Color(0xFF17A2B8),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          TextButton(
-            onPressed: _saveProfile,
-            child: const Text(
-              'Save',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          // Show spinner if loading, otherwise show Save button
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(right: 16.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+            )
+          else
+            TextButton(
+              onPressed: _saveProfile,
+              child: const Text(
+                'Save',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
             ),
-          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -114,28 +194,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 16),
                     
                     _buildTextField(
-                      controller: _emailController,
-                      label: 'Email Address',
-                      icon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    _buildTextField(
                       controller: _phoneController,
                       label: 'Phone Number',
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    _buildTextField(
-                      controller: _statusController,
-                      label: 'Status Message',
-                      icon: Icons.message_outlined,
-                      maxLines: 2,
                     ),
                   ],
                 ),
@@ -253,16 +315,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _saveProfile() {
-    // Implement save functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✅ Profile updated successfully'),
-        backgroundColor: Colors.green,
       ),
     );
   }

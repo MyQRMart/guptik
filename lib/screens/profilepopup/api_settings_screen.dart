@@ -11,9 +11,6 @@ class ApiSettingsScreen extends StatefulWidget {
 
 class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _accessTokenController = TextEditingController();
-  final _phoneNumberIdController = TextEditingController();
-  final _businessAccountIdController = TextEditingController();
   final _callbackUrlController = TextEditingController();
   final _verifyTokenController = TextEditingController();
   
@@ -30,9 +27,6 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
   @override
   void dispose() {
-    _accessTokenController.dispose();
-    _phoneNumberIdController.dispose();
-    _businessAccountIdController.dispose();
     _callbackUrlController.dispose();
     _verifyTokenController.dispose();
     super.dispose();
@@ -52,9 +46,6 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
       if (response != null) {
         setState(() {
-          _accessTokenController.text = response['whatsapp_access_token'] ?? '';
-          _phoneNumberIdController.text = response['phone_number_id'] ?? '';
-          _businessAccountIdController.text = response['business_account_id'] ?? '';
           _callbackUrlController.text = response['callback_url'] ?? 'https://app.metafly.com/webhooks';
           _verifyTokenController.text = response['verify_token'] ?? 'meta-fly';
           _metaflyApiKey = response['metafly_api_key'];
@@ -88,9 +79,6 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
       // Save API keys to database
       await Supabase.instance.client.from('user_api_settings').upsert({
         'user_id': user.id,
-        'whatsapp_access_token': _accessTokenController.text.trim(),
-        'phone_number_id': _phoneNumberIdController.text.trim(),
-        'business_account_id': _businessAccountIdController.text.trim(),
         'callback_url': _callbackUrlController.text.trim(),
         'verify_token': _verifyTokenController.text.trim(),
         'metafly_api_key': _metaflyApiKey,
@@ -144,9 +132,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
     try {
       // Validate all required fields
-      if (_accessTokenController.text.trim().isEmpty || 
-          _phoneNumberIdController.text.trim().isEmpty ||
-          _businessAccountIdController.text.trim().isEmpty) {
+      if (_callbackUrlController.text.trim().isEmpty || _verifyTokenController.text.trim().isEmpty) {
         throw Exception('Please fill all required fields');
       }
 
@@ -229,77 +215,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                     ],
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // API Keys Form
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'API Credentials',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Access Token
-                      _buildApiKeyField(
-                        controller: _accessTokenController,
-                        label: 'WhatsApp Access Token',
-                        hint: 'Paste your WhatsApp Business API access token here',
-                        icon: Icons.vpn_key,
-                        isPassword: !_showAccessToken,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Access token is required';
-                          }
-                          return null;
-                        },
-                        suffixIcon: IconButton(
-                          icon: Icon(_showAccessToken ? Icons.visibility_off : Icons.visibility),
-                          onPressed: () => setState(() => _showAccessToken = !_showAccessToken),
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Phone Number ID
-                      _buildApiKeyField(
-                        controller: _phoneNumberIdController,
-                        label: 'Phone Number ID',
-                        hint: 'Enter your WhatsApp phone number ID',
-                        icon: Icons.phone,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Phone Number ID is required';
-                          }
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Business Account ID
-                      _buildApiKeyField(
-                        controller: _businessAccountIdController,
-                        label: 'Business Account ID',
-                        hint: 'Enter your WhatsApp Business Account ID',
-                        icon: Icons.business,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Business Account ID is required';
-                          }
-                          return null;
-                        },
-                      ),
-
+              ),    
                       const SizedBox(height: 24),
 
                       // Webhook Configuration Section
@@ -374,10 +290,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    
+                  
+                
+              
 
               const SizedBox(height: 24),
 

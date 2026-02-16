@@ -4,7 +4,7 @@ import 'package:guptik/screens/profilepopup/api_settings_screen.dart';
 import 'package:guptik/screens/profilepopup/integrations_screen.dart';
 import 'package:guptik/screens/profilepopup/profile_screen.dart';
 import 'package:guptik/screens/profilepopup/referral_screen.dart';
-import 'package:guptik/screens/profilepopup/subscriptions_screen.dart';
+import 'package:guptik/screens/profilepopup/facebook&instagram_screen.dart';
 import 'package:guptik/screens/profilepopup/support_screen.dart';
 import 'package:guptik/screens/profilepopup/webhook_configuration_screen.dart';
 import 'package:guptik/screens/profilepopup/whatsapp_numbers_screen.dart';
@@ -151,7 +151,7 @@ class _MyAppState extends State<MyApp> {
         '/webhook-config': (context) => const WebhookConfigurationScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/whatsapp-numbers': (context) => const WhatsAppNumbersScreen(),
-        '/subscriptions': (context) => const SubscriptionsScreen(),
+        '/facebook-instagram': (context) => const FacebookAndInstagramScreen(),
         '/integrations': (context) => const IntegrationsScreen(),
         '/referral': (context) => const ReferralScreen(),
         '/support': (context) => const SupportScreen(),

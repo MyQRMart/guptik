@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WhatsAppNumbersScreen extends StatefulWidget {
   const WhatsAppNumbersScreen({super.key});
@@ -9,28 +10,151 @@ class WhatsAppNumbersScreen extends StatefulWidget {
 }
 
 class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
-  final List<Map<String, dynamic>> _numbers = [
-    {
-      'id': '1',
-      'number': '+1 234 567 8900',
-      'display_name': 'Main Business Line',
-      'status': 'Active',
-      'verified': true,
-      'quality_rating': 'High',
-      'messaging_limit': 'Tier 3',
-      'last_used': DateTime.now().subtract(const Duration(hours: 2)),
-    },
-    {
-      'id': '2', 
-      'number': '+1 234 567 8901',
-      'display_name': 'Customer Support',
-      'status': 'Active',
-      'verified': true,
-      'quality_rating': 'Medium',
-      'messaging_limit': 'Tier 2',
-      'last_used': DateTime.now().subtract(const Duration(days: 1)),
-    },
-  ];
+  // Local list (Note: Your DB only supports 1 account per user, so this list will max out at 1 item)
+  final List<Map<String, dynamic>> _accounts = [];
+
+  // Controllers
+  final TextEditingController _tokenController = TextEditingController();
+  final TextEditingController _phoneIdController = TextEditingController();
+  final TextEditingController _businessIdController = TextEditingController();
+  final TextEditingController _mobileNumberController = TextEditingController();
+
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedKeys();
+  }
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    _phoneIdController.dispose();
+    _businessIdController.dispose();
+    _mobileNumberController.dispose();
+    super.dispose();
+  }
+
+  // --- 1. FIXED LOAD LOGIC ---
+  Future<void> _loadSavedKeys() async {
+    try {
+      setState(() => _isLoading = true);
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final response = await Supabase.instance.client
+          .from('user_api_settings')
+          .select()
+          .eq('user_id', user.id);
+
+      if (mounted) {
+        setState(() {
+          _accounts.clear();
+          for (var item in response) {
+            _accounts.add({
+              'id': item['id'],
+              // MATCHING YOUR SCHEMA COLUMNS HERE:
+              'token': item['whatsapp_access_token'],
+              'phone_id': item['meta_wa_phone_number_id'],       // Fixed
+              'business_id': item['meta_business_account_id'], // Fixed
+              'mobile_number': item['mobile_number'],
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading saved keys: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- 2. FIXED SAVE LOGIC ---
+  Future<void> _addAccountToSupabase() async {
+    if (_tokenController.text.isEmpty ||
+        _phoneIdController.text.isEmpty ||
+        _businessIdController.text.isEmpty) {
+      return;
+    }
+
+    try {
+      Navigator.pop(context); 
+      setState(() => _isLoading = true);
+
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // MATCHING YOUR SCHEMA COLUMNS HERE:
+      final data = {
+        'user_id': user.id,
+        'whatsapp_access_token': _tokenController.text,
+        'meta_wa_phone_number_id': _phoneIdController.text,      // Fixed
+        'meta_business_account_id': _businessIdController.text, // Fixed
+        'mobile_number': _mobileNumberController.text,
+      };
+
+      // Using UPSERT because your schema has a UNIQUE constraint on user_id.
+      // This ensures we update the existing row if it exists, rather than crashing.
+      final response = await Supabase.instance.client
+          .from('user_api_settings')
+          .upsert(data, onConflict: 'user_id') 
+          .select()
+          .single();
+
+      setState(() {
+        // Since we upserted, we clear the list and re-add the single active account
+        _accounts.clear();
+        _accounts.add({
+          'id': response['id'],
+          'token': _tokenController.text,
+          'phone_id': _phoneIdController.text,
+          'business_id': _businessIdController.text,
+          'mobile_number': _mobileNumberController.text,
+        });
+      });
+
+      _tokenController.clear();
+      _phoneIdController.clear();
+      _businessIdController.clear();
+      _mobileNumberController.clear();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account settings saved successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- 3. DELETE LOGIC ---
+  Future<void> _deleteAccount(int index) async {
+    try {
+      final accountId = _accounts[index]['id'];
+      if (accountId == null) return;
+
+      await Supabase.instance.client
+          .from('user_api_settings')
+          .delete()
+          .eq('id', accountId);
+
+      setState(() {
+        _accounts.removeAt(index);
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,262 +162,179 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text(
-          'WhatsApp Numbers',
+          'WhatsApp Settings', // Renamed slightly since it's single account
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         backgroundColor: const Color(0xFF17A2B8),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddNumberDialog,
-          ),
+          // Only show Add button if list is empty (enforcing 1 account limit from UI side too)
+          if (_accounts.isEmpty)
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: _showAddAccountDialog,
+            ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            const Text(
-              'Manage WhatsApp Business Numbers',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add, verify, and manage your WhatsApp Business phone numbers.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-            
-            const SizedBox(height: 30),
-            
-            // Numbers List
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _numbers.length,
-              itemBuilder: (context, index) {
-                final number = _numbers[index];
-                return _buildNumberCard(number);
-              },
-            ),
-            
-            const SizedBox(height: 30),
-            
-            // Add Number Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _showAddNumberDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('Add New WhatsApp Number'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF17A2B8),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator()) 
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'WhatsApp Business Configuration',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Manage your Meta API keys.',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 30),
+                  
+                  if (_accounts.isEmpty)
+                    _buildEmptyState()
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _accounts.length,
+                      itemBuilder: (context, index) {
+                        return _buildAccountCard(_accounts[index], index);
+                      },
+                    ),
+                ],
               ),
             ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Column(
+          children: [
+            Icon(Icons.account_tree_outlined, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              'No API keys configured.',
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _showAddAccountDialog,
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF17A2B8), foregroundColor: Colors.white),
+              child: const Text("Configure Now"),
+            )
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNumberCard(Map<String, dynamic> number) {
+  Widget _buildAccountCard(Map<String, dynamic> account, int index) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        number['display_name'],
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              number['number'],
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (number['verified'])
-                            const Icon(
-                              Icons.verified,
-                              color: Colors.green,
-                              size: 16,
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
+                const Text(
+                  "Active Configuration",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(number['status']),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    number['status'],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () => _deleteAccount(index),
                 ),
               ],
             ),
-            
-            const SizedBox(height: 16),
-            
-            // Metrics Row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetric('Quality Rating', number['quality_rating']),
-                ),
-                Expanded(
-                  child: _buildMetric('Messaging Limit', number['messaging_limit']),
-                ),
-                Expanded(
-                  child: _buildMetric('Last Used', _formatDate(number['last_used'])),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Actions
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                TextButton.icon(
-                  onPressed: () => _copyNumber(number['number']),
-                  icon: const Icon(Icons.copy, size: 16),
-                  label: const Text('Copy'),
-                ),
-                TextButton.icon(
-                  onPressed: () => _editNumber(number),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit'),
-                ),
-                TextButton.icon(
-                  onPressed: () => _verifyNumber(number),
-                  icon: const Icon(Icons.verified_user, size: 16),
-                  label: Text(number['verified'] ? 'Re-verify' : 'Verify'),
-                ),
-              ],
-            ),
+            const Divider(),
+            _buildInfoRow("Phone ID", account['phone_id'] ?? ''),
+            _buildInfoRow("Business ID", account['business_id'] ?? ''),
+            _buildInfoRow("Mobile", account['mobile_number'] ?? 'Not provided'),
+            _buildInfoRow("Token", "••••••••${(account['token'] ?? '').toString().characters.takeLast(4)}"),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMetric(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.w600)),
+          Expanded(child: Text(value, style: TextStyle(color: Colors.grey[700]))),
+          IconButton(
+            icon: const Icon(Icons.copy, size: 16),
+            onPressed: () => Clipboard.setData(ClipboardData(text: value)),
+          )
+        ],
+      ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'suspended':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    
-    if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
-  }
-
-  void _copyNumber(String number) {
-    Clipboard.setData(ClipboardData(text: number));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Number copied to clipboard')),
-    );
-  }
-
-  void _editNumber(Map<String, dynamic> number) {
-    // Show edit dialog
+  void _showAddAccountDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit WhatsApp Number'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              decoration: const InputDecoration(
-                labelText: 'Display Name',
-                border: OutlineInputBorder(),
+        title: const Text('Configure WhatsApp'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _tokenController,
+                decoration: const InputDecoration(
+                  labelText: 'WhatsApp Access Token',
+                  border: OutlineInputBorder(),
+                  hintText: 'EAAG...',
+                ),
               ),
-              controller: TextEditingController(text: number['display_name']),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: _phoneIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number ID (Meta)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _businessIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Business Account ID (Meta)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _mobileNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile Number',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -301,82 +342,8 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Number updated successfully')),
-              );
-            },
+            onPressed: _addAccountToSupabase,
             child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _verifyNumber(Map<String, dynamic> number) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Verify WhatsApp Number'),
-        content: Text('Send verification code to ${number['number']}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Verification code sent')),
-              );
-            },
-            child: const Text('Send Code'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddNumberDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add WhatsApp Number'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Phone Number',
-                border: OutlineInputBorder(),
-                prefixText: '+',
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 16),
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Display Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Number added successfully')),
-              );
-            },
-            child: const Text('Add'),
           ),
         ],
       ),
