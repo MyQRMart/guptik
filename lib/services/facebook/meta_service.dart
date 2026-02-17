@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart'; // For debugPrint
 import 'package:guptik/models/facebook/meta_chat_model.dart';
-import 'package:guptik/models/facebook/meta_content_model.dart';
+import 'package:guptik/models/facebook/meta_content_model.dart'; // For SocialPlatform enum
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path/path.dart' as path;
@@ -131,7 +131,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 🚀 2. UPLOAD POST (Binary Upload Fix)
+  // 🚀 2. UPLOAD POST (THE REAL BUCKET METHOD)
   // ---------------------------------------------------------------------------
   Future<bool> uploadPost(SocialPlatform platform, File imageFile, String caption) async {
     final creds = await _getCredentials();
@@ -161,7 +161,7 @@ class MetaService {
       }
     } 
     
-    // --- B. INSTAGRAM UPLOAD (Binary Upload Fix) ---
+    // --- B. INSTAGRAM UPLOAD (Using Supabase Bucket) ---
     else {
       final String? igId = creds['instagram_account_id'];
       if (igId == null) return false;
@@ -170,20 +170,21 @@ class MetaService {
         // Step 1: Upload to Supabase to get Public URL
         final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imageFile.path)}';
         
-        // ✅ CRITICAL FIX: Read file as bytes first to bypass FileSystem attributes
+        // Read file as Bytes to avoid file system errors
         final bytes = await imageFile.readAsBytes();
-        final String fileExt = path.extension(imageFile.path).replaceAll('.', ''); // e.g., 'jpg' or 'png'
-
+        
+        // Upload to 'post_images' bucket
         await Supabase.instance.client.storage.from('post_images').uploadBinary(
           fileName,
           bytes,
-          fileOptions: FileOptions(
-            contentType: 'image/$fileExt', // Explicitly set content type
-            upsert: true,                  // Force overwrite if needed
+          fileOptions: const FileOptions(
+            contentType: 'image/jpeg', // Force JPEG content type
+            upsert: true,
           ),
         );
 
         final String publicUrl = Supabase.instance.client.storage.from('post_images').getPublicUrl(fileName);
+        debugPrint("Image Uploaded to Supabase: $publicUrl");
 
         // Step 2: Create Media Container
         final containerUrl = Uri.parse('https://graph.facebook.com/$_graphApiVersion/$igId/media');
@@ -221,7 +222,6 @@ class MetaService {
   // ---------------------------------------------------------------------------
   Future<List<MetaChat>> getUnifiedInbox() async {
     final creds = await _getCredentials();
-    
     final String? fbPageId = creds['facebook_account_id'];
     final String? igAccountId = creds['instagram_account_id'];
     final String? accessToken = creds['facebook_page_access_token'] ?? creds['facebook_user_access_token'];
@@ -266,7 +266,6 @@ class MetaService {
       } catch (e) { debugPrint("IG Inbox Error: $e"); }
     }
 
-    // Sort Newest First
     allChats.sort((a, b) {
       DateTime? timeA = _parseIsoTime(a.rawTimestamp);
       DateTime? timeB = _parseIsoTime(b.rawTimestamp);
@@ -279,7 +278,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 🗨️ 4. GET SPECIFIC CHAT MESSAGES (Detail Screen)
+  // 🗨️ 4. GET SPECIFIC CHAT MESSAGES
   // ---------------------------------------------------------------------------
   Future<List<Map<String, dynamic>>> getChatMessages(String conversationId) async {
     final creds = await _getCredentials();
@@ -299,7 +298,7 @@ class MetaService {
         return rawMsgs.map((m) {
           return {
             'message': m['message'] ?? '',
-            'is_from_me': false, // Logic to determine sender needed for perfection
+            'is_from_me': false, 
             'created_time': m['created_time'],
           };
         }).toList();
@@ -311,7 +310,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 📨 5. SEND MESSAGE (Reply Capability)
+  // 📨 5. SEND MESSAGE
   // ---------------------------------------------------------------------------
   Future<bool> sendMessage(String conversationId, String message) async {
     final creds = await _getCredentials();
@@ -319,7 +318,6 @@ class MetaService {
 
     if (accessToken == null) return false;
 
-    // Use the /messages endpoint to send a reply
     final url = Uri.parse('https://graph.facebook.com/$_graphApiVersion/$conversationId/messages');
 
     try {

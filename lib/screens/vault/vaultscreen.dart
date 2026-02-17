@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'dart:typed_data';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+// Import the new service
+import 'package:guptik/services/vault/vault_sync_service.dart';
 
 class VaultScreen extends StatefulWidget {
   const VaultScreen({super.key});
@@ -14,19 +16,45 @@ class VaultScreen extends StatefulWidget {
 }
 
 class _VaultScreenState extends State<VaultScreen> {
+  AssetPathEntity? _currentAlbum;
+  final List<AssetEntity> _allAssets = [];
   final Map<String, List<AssetEntity>> _groupedAssets = {};
+  
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   bool _hasPermission = false;
-  final String _desktopSyncUrl = "https://your-desktop-app-endpoint.com/api/sync";
+  
+  int _currentPage = 0;
+  final int _pageSize = 80;
+  int _totalAssetCount = 0;
+  
+  final ScrollController _scrollController = ScrollController();
+  
+  // SYNC STATE VARIABLES
   bool _isSyncing = false;
+  String _syncStatusText = "";
+  double _syncProgress = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _fetchAssets();
+    _initialLoad();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _fetchAssets() async {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+      _loadMoreAssets();
+    }
+  }
+
+  Future<void> _initialLoad() async {
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
     if (!ps.isAuth) {
       if (mounted) setState(() { _hasPermission = false; _isLoading = false; });
@@ -34,9 +62,7 @@ class _VaultScreenState extends State<VaultScreen> {
     }
 
     final FilterOptionGroup filterOption = FilterOptionGroup(
-      orders: [
-        const OrderOption(type: OrderOptionType.createDate, asc: false),
-      ],
+      orders: [const OrderOption(type: OrderOptionType.createDate, asc: false)],
     );
 
     final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
@@ -49,22 +75,47 @@ class _VaultScreenState extends State<VaultScreen> {
       return;
     }
 
-    final List<AssetEntity> recentAssets = await albums[0].getAssetListRange(start: 0, end: 100);
+    _currentAlbum = albums[0]; 
+    _totalAssetCount = await _currentAlbum!.assetCountAsync;
+    
+    final List<AssetEntity> newAssets = await _currentAlbum!.getAssetListPaged(
+      page: 0,
+      size: _pageSize,
+    );
 
-    Map<String, List<AssetEntity>> tempGroup = {};
-    for (var asset in recentAssets) {
-      String dateLabel = _getDateLabel(asset.createDateTime);
-      if (tempGroup[dateLabel] == null) tempGroup[dateLabel] = [];
-      tempGroup[dateLabel]!.add(asset);
-    }
-
+    _processAssets(newAssets);
+    
     if (mounted) {
       setState(() {
         _hasPermission = true;
-        _groupedAssets.clear();
-        _groupedAssets.addAll(tempGroup);
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMoreAssets() async {
+    if (_isLoadingMore || _allAssets.length >= _totalAssetCount || _currentAlbum == null) return;
+
+    setState(() => _isLoadingMore = true);
+    _currentPage++;
+
+    final List<AssetEntity> nextAssets = await _currentAlbum!.getAssetListPaged(
+      page: _currentPage,
+      size: _pageSize,
+    );
+
+    _processAssets(nextAssets);
+    if (mounted) setState(() => _isLoadingMore = false);
+  }
+
+  void _processAssets(List<AssetEntity> newAssets) {
+    _allAssets.addAll(newAssets);
+    for (var asset in newAssets) {
+      String dateLabel = _getDateLabel(asset.createDateTime);
+      if (_groupedAssets[dateLabel] == null) {
+        _groupedAssets[dateLabel] = [];
+      }
+      _groupedAssets[dateLabel]!.add(asset);
     }
   }
 
@@ -79,20 +130,160 @@ class _VaultScreenState extends State<VaultScreen> {
     return DateFormat('EEE, MMM d').format(date); 
   }
 
+  // ==========================================
+  // REAL SYNC LOGIC HERE
+  // ==========================================
+ // ==========================================
+  // SYNC ALL (BATCHED MODE)
+  // ==========================================
   Future<void> _handleSync() async {
+    if (_isSyncing) return;
+
+    // 1. Initial Checks
+    if (_currentAlbum == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No album loaded yet. Please wait.")),
+      );
+      return;
+    }
+
+    final syncService = VaultSyncService();
+    
+    // UI: Show Progress Dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false, 
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Syncing Vault"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(value: _syncProgress),
+                  const SizedBox(height: 20),
+                  Text(
+                    _syncStatusText, 
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text("Please keep the app open.", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
     setState(() => _isSyncing = true);
+
     try {
-      debugPrint("Syncing real assets to: $_desktopSyncUrl");
-      await Future.delayed(const Duration(seconds: 2));
+      // 2. Connect to Desktop
+      _updateSyncStatus("Connecting...", 0.0);
+      final String? url = await syncService.getDesktopUrl();
+
+      if (url == null) throw Exception("No Desktop Found. Is Guptik installed?");
+      
+      if (!await syncService.isGatewayOnline(url)) {
+        throw Exception("Desktop is OFFLINE. Please check your PC.");
+      }
+
+      // 3. Get TOTAL count (e.g., 5000)
+      final int totalCount = await _currentAlbum!.assetCountAsync;
+      
+      if (totalCount == 0) throw Exception("Gallery is empty!");
+
+      int successCount = 0;
+      int batchSize = 50; // Process 50 at a time to save RAM
+
+      // 4. LOOP THROUGH ALL PHOTOS (In Batches)
+      for (int i = 0; i < totalCount; i += batchSize) {
+        if (!mounted) break; // Stop if user closed screen
+
+        // Calculate end index
+        int end = (i + batchSize < totalCount) ? i + batchSize : totalCount;
+
+        // Fetch this batch ONLY
+        List<AssetEntity> batch = await _currentAlbum!.getAssetListRange(
+          start: i, 
+          end: end
+        );
+
+        // Upload items in this batch
+        for (int j = 0; j < batch.length; j++) {
+          final asset = batch[j];
+          final file = await asset.file;
+          
+          // Calculate global current index
+          int currentIndex = i + j + 1;
+
+          if (file != null) {
+            // Update Progress
+            double progress = currentIndex / totalCount;
+            _updateSyncStatus("Syncing $currentIndex of $totalCount", progress);
+
+            // Upload
+            bool success = await syncService.uploadFile(file, url);
+            if (success) successCount++;
+          }
+        }
+        
+        // Clear batch from memory
+        batch.clear();
+      }
+
+      // 5. Done
       if (mounted) {
+        Navigator.pop(context); // Close Dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Synced to Desktop successfully!')),
+          SnackBar(
+            content: Text('Sync Complete! Sent $successCount / $totalCount files.'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Sync Error"),
+            content: Text(e.toString()),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
+          ),
         );
       }
     } finally {
-      setState(() => _isSyncing = false);
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncStatusText = "";
+          _syncProgress = 0.0;
+        });
+      }
     }
   }
+
+  // Helper to force UI update
+  void _updateSyncStatus(String text, double progress) {
+    // 1. Update Main Screen State
+    setState(() {
+      _syncStatusText = text;
+      _syncProgress = progress;
+    });
+    
+    // 2. Force Dialog Rebuild (The dialog relies on these variables)
+    // By calling setState, the StatefulBuilder inside the dialog will re-read the variables
+    (context as Element).markNeedsBuild();
+  }
+
+
 
   void _openFullScreen(AssetEntity asset) {
     Navigator.push(
@@ -106,20 +297,38 @@ class _VaultScreenState extends State<VaultScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           SliverAppBar(
             floating: true,
             pinned: true,
-            title: const Text("Guptik Vault", style: TextStyle(color: Colors.black)),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Guptik Vault", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500)),
+                // Show Sync Status Text if syncing
+                if (_isSyncing)
+                  Text(_syncStatusText, style: const TextStyle(color: Colors.purple, fontSize: 12))
+              ],
+            ),
             backgroundColor: Colors.white,
             elevation: 0.5,
             iconTheme: const IconThemeData(color: Colors.black),
             actions: [
+              // Sync Button with Progress
+              if (_isSyncing)
+                 Padding(
+                   padding: const EdgeInsets.only(right: 15),
+                   child: SizedBox(
+                     width: 20, height: 20,
+                     child: CircularProgressIndicator(value: _syncProgress, strokeWidth: 3),
+                   ),
+                 )
+              else
                IconButton(
-                icon: _isSyncing
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.cloud_upload_outlined),
-                onPressed: _isSyncing ? null : _handleSync,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                onPressed: _handleSync,
+                tooltip: "Sync to Desktop",
               ),
               const SizedBox(width: 10),
               const CircleAvatar(
@@ -176,6 +385,15 @@ class _VaultScreenState extends State<VaultScreen> {
                 ],
               );
             }),
+            
+            if (_isLoadingMore)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+              
             const SliverToBoxAdapter(child: SizedBox(height: 50)),
         ],
       ),
@@ -183,12 +401,14 @@ class _VaultScreenState extends State<VaultScreen> {
   }
 }
 
+// ... (KEEP THE REST OF THE CLASSES: MediaViewerPage, _VideoPlayerItem, etc. AS THEY WERE) ...
+// (I will omit them here for brevity unless you need the full file again, 
+//  but the structure above handles the Sync Logic fully)
 // ==========================================
-// 1. FULL SCREEN VIEWER (With Info Sheet)
+// 1. FULL SCREEN VIEWER
 // ==========================================
 class MediaViewerPage extends StatefulWidget {
   final AssetEntity asset;
-
   const MediaViewerPage({super.key, required this.asset});
 
   @override
@@ -212,12 +432,10 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
     }
   }
 
-  // --- SHOW INFO SHEET LOGIC ---
   void _showInfo() async {
-    // Fetch file details asynchronously
     final File? file = await widget.asset.file;
     final int sizeBytes = file?.lengthSync() ?? 0;
-    final String sizeString = (sizeBytes / (1024 * 1024)).toStringAsFixed(2); // Convert to MB
+    final String sizeString = (sizeBytes / (1024 * 1024)).toStringAsFixed(2);
     final String path = file?.path ?? "Unknown Path";
     final String resolution = "${widget.asset.width} x ${widget.asset.height}";
     final String date = DateFormat('EEE, MMM d, y • h:mm a').format(widget.asset.createDateTime);
@@ -227,32 +445,21 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(20),
-          color: Colors.white, // White background for clean look
+          color: Colors.white,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Info",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+              const Text("Info", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
-              
-              // Date & Time
               _infoRow(Icons.calendar_today, "Date", date),
               const Divider(),
-              
-              // File Name & Resolution
               _infoRow(Icons.image, "Details", "${widget.asset.title ?? 'Unknown'}\n$resolution • ${sizeString}MB"),
               const Divider(),
-              
-              // File Path
               _infoRow(Icons.folder_open, "Path on Device", path),
             ],
           ),
@@ -293,17 +500,9 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           _isSharing
-              ? const Padding(
-                  padding: EdgeInsets.only(right: 16),
-                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
-                )
+              ? const Padding(padding: EdgeInsets.only(right: 16), child: CircularProgressIndicator(color: Colors.white))
               : IconButton(icon: const Icon(Icons.share), onPressed: _shareAsset),
-          
-          // INFO BUTTON
-          IconButton(
-            icon: const Icon(Icons.info_outline), 
-            onPressed: _showInfo, // <--- Triggers the bottom sheet
-          ),
+          IconButton(icon: const Icon(Icons.info_outline), onPressed: _showInfo),
         ],
       ),
       body: Center(
@@ -312,12 +511,8 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
             : FutureBuilder<Uint8List?>(
                 future: widget.asset.originBytes,
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const CircularProgressIndicator(color: Colors.white);
-                  }
-                  return InteractiveViewer(
-                    child: Image.memory(snapshot.data!, fit: BoxFit.contain),
-                  );
+                  if (!snapshot.hasData) return const CircularProgressIndicator(color: Colors.white);
+                  return InteractiveViewer(child: Image.memory(snapshot.data!, fit: BoxFit.contain));
                 },
               ),
       ),
@@ -331,7 +526,6 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
 class _VideoPlayerItem extends StatefulWidget {
   final AssetEntity asset;
   const _VideoPlayerItem({required this.asset});
-
   @override
   State<_VideoPlayerItem> createState() => _VideoPlayerItemState();
 }
@@ -339,57 +533,32 @@ class _VideoPlayerItem extends StatefulWidget {
 class _VideoPlayerItemState extends State<_VideoPlayerItem> {
   VideoPlayerController? _controller;
   bool _initialized = false;
-
   @override
   void initState() {
     super.initState();
     _initVideo();
   }
-
   Future<void> _initVideo() async {
     final file = await widget.asset.file;
     if (file != null) {
-      _controller = VideoPlayerController.file(file)
-        ..initialize().then((_) {
-          if (mounted) {
-            setState(() => _initialized = true);
-            _controller!.play(); 
-          }
-        });
+      _controller = VideoPlayerController.file(file)..initialize().then((_) {
+        if (mounted) { setState(() => _initialized = true); _controller!.play(); }
+      });
     }
   }
-
   @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
+  void dispose() { _controller?.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
-    if (!_initialized || _controller == null) {
-      return const CircularProgressIndicator(color: Colors.white);
-    }
-
+    if (!_initialized || _controller == null) return const CircularProgressIndicator(color: Colors.white);
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
-        });
-      },
+      onTap: () { setState(() => _controller!.value.isPlaying ? _controller!.pause() : _controller!.play()); },
       child: Stack(
         alignment: Alignment.center,
         children: [
-          AspectRatio(
-            aspectRatio: _controller!.value.aspectRatio,
-            child: VideoPlayer(_controller!),
-          ),
+          AspectRatio(aspectRatio: _controller!.value.aspectRatio, child: VideoPlayer(_controller!)),
           if (!_controller!.value.isPlaying)
-            Container(
-              decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(50)),
-              padding: const EdgeInsets.all(12),
-              child: const Icon(Icons.play_arrow, color: Colors.white, size: 50),
-            ),
+            Container(padding: const EdgeInsets.all(12), decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle), child: const Icon(Icons.play_arrow, color: Colors.white, size: 50)),
         ],
       ),
     );
@@ -402,42 +571,26 @@ class _VideoPlayerItemState extends State<_VideoPlayerItem> {
 class _RealMediaTile extends StatelessWidget {
   final AssetEntity asset;
   const _RealMediaTile({required this.asset});
-
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
         FutureBuilder<Uint8List?>(
-          future: asset.thumbnailDataWithSize(const ThumbnailSize.square(250)),
+          future: asset.thumbnailDataWithSize(const ThumbnailSize.square(200)), 
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
-              return Image.memory(snapshot.data!, fit: BoxFit.cover, gaplessPlayback: true);
+              return Image.memory(snapshot.data!, fit: BoxFit.cover, gaplessPlayback: true,
+                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300], child: const Icon(Icons.broken_image, color: Colors.grey)));
             }
             return Container(color: Colors.grey[200]);
           },
         ),
-        if (asset.type == AssetType.video)
-          const Positioned(
-            top: 5, right: 5,
-            child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 20),
-          ),
-        if (asset.type == AssetType.video)
-          Positioned(
-            bottom: 5, right: 5,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-              child: Text(
-                _formatDuration(asset.duration),
-                style: const TextStyle(color: Colors.white, fontSize: 10),
-              ),
-            ),
-          ),
+        if (asset.type == AssetType.video) const Positioned(top: 5, right: 5, child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 20)),
+        if (asset.type == AssetType.video) Positioned(bottom: 5, right: 5, child: Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)), child: Text(_formatDuration(asset.duration), style: const TextStyle(color: Colors.white, fontSize: 10)))),
       ],
     );
   }
-
   String _formatDuration(int seconds) {
     final duration = Duration(seconds: seconds);
     final min = duration.inMinutes;
@@ -446,23 +599,13 @@ class _RealMediaTile extends StatelessWidget {
   }
 }
 
-// ==========================================
-// 4. HEADER DELEGATE
-// ==========================================
 class _DateHeaderDelegate extends SliverPersistentHeaderDelegate {
   final String title;
   _DateHeaderDelegate({required this.title});
-
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white.withAlpha(245),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      alignment: Alignment.centerLeft,
-      child: Text(title, style: const TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w600)),
-    );
+    return Container(color: Colors.white.withAlpha(245), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), alignment: Alignment.centerLeft, child: Text(title, style: const TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w600)));
   }
-
   @override
   double get maxExtent => 45;
   @override
