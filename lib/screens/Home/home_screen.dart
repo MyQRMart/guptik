@@ -7,7 +7,7 @@ import 'package:guptik/screens/facebook/fb_and_insta_screen.dart';
 import 'package:guptik/screens/guptik/guptik_screen.dart';
 import 'package:guptik/screens/home_control/homecontrol_screen.dart';
 import 'package:guptik/screens/security/security_screen.dart';
-import 'package:guptik/screens/trust_me/trust_me_screen.dart';
+import 'package:guptik/screens/trust_me/trust_me_home_screen.dart';
 import 'package:guptik/screens/vault/vaultscreen.dart';
 import 'package:guptik/services/dashboard/whatsapp_business_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1828,7 +1828,7 @@ Row(
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const TrustMeScreen(),
+                    builder: (context) => const TrustMeHomeScreen(),
                   ),
                 );
               },
