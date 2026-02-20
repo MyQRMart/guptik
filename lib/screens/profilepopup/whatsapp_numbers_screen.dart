@@ -10,13 +10,12 @@ class WhatsAppNumbersScreen extends StatefulWidget {
 }
 
 class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
-  // Local list (Note: Your DB only supports 1 account per user, so this list will max out at 1 item)
   final List<Map<String, dynamic>> _accounts = [];
 
-  // Controllers
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _phoneIdController = TextEditingController();
   final TextEditingController _businessIdController = TextEditingController();
+  final TextEditingController _appIdController = TextEditingController();
   final TextEditingController _mobileNumberController = TextEditingController();
 
   bool _isLoading = false;
@@ -32,11 +31,11 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
     _tokenController.dispose();
     _phoneIdController.dispose();
     _businessIdController.dispose();
+    _appIdController.dispose();
     _mobileNumberController.dispose();
     super.dispose();
   }
 
-  // --- 1. FIXED LOAD LOGIC ---
   Future<void> _loadSavedKeys() async {
     try {
       setState(() => _isLoading = true);
@@ -54,10 +53,10 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
           for (var item in response) {
             _accounts.add({
               'id': item['id'],
-              // MATCHING YOUR SCHEMA COLUMNS HERE:
               'token': item['whatsapp_access_token'],
-              'phone_id': item['meta_wa_phone_number_id'],       // Fixed
-              'business_id': item['meta_business_account_id'], // Fixed
+              'phone_id': item['meta_wa_phone_number_id'],
+              'business_id': item['meta_business_account_id'],
+              'app_id': item['meta_app_id'],
               'mobile_number': item['mobile_number'],
             });
           }
@@ -70,46 +69,44 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
     }
   }
 
-  // --- 2. FIXED SAVE LOGIC ---
   Future<void> _addAccountToSupabase() async {
     if (_tokenController.text.isEmpty ||
         _phoneIdController.text.isEmpty ||
-        _businessIdController.text.isEmpty) {
+        _businessIdController.text.isEmpty ||
+        _appIdController.text.isEmpty) {
       return;
     }
 
     try {
-      Navigator.pop(context); 
+      Navigator.pop(context);
       setState(() => _isLoading = true);
 
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      // MATCHING YOUR SCHEMA COLUMNS HERE:
       final data = {
         'user_id': user.id,
         'whatsapp_access_token': _tokenController.text,
-        'meta_wa_phone_number_id': _phoneIdController.text,      // Fixed
-        'meta_business_account_id': _businessIdController.text, // Fixed
+        'meta_wa_phone_number_id': _phoneIdController.text,
+        'meta_business_account_id': _businessIdController.text,
+        'meta_app_id': _appIdController.text,
         'mobile_number': _mobileNumberController.text,
       };
 
-      // Using UPSERT because your schema has a UNIQUE constraint on user_id.
-      // This ensures we update the existing row if it exists, rather than crashing.
       final response = await Supabase.instance.client
           .from('user_api_settings')
-          .upsert(data, onConflict: 'user_id') 
+          .upsert(data, onConflict: 'user_id')
           .select()
           .single();
 
       setState(() {
-        // Since we upserted, we clear the list and re-add the single active account
         _accounts.clear();
         _accounts.add({
           'id': response['id'],
           'token': _tokenController.text,
           'phone_id': _phoneIdController.text,
           'business_id': _businessIdController.text,
+          'app_id': _appIdController.text,
           'mobile_number': _mobileNumberController.text,
         });
       });
@@ -117,6 +114,7 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
       _tokenController.clear();
       _phoneIdController.clear();
       _businessIdController.clear();
+      _appIdController.clear();
       _mobileNumberController.clear();
 
       if (mounted) {
@@ -126,16 +124,15 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- 3. DELETE LOGIC ---
   Future<void> _deleteAccount(int index) async {
     try {
       final accountId = _accounts[index]['id'];
@@ -150,9 +147,9 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
         _accounts.removeAt(index);
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error deleting: $e')));
     }
   }
 
@@ -162,13 +159,12 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text(
-          'WhatsApp Settings', // Renamed slightly since it's single account
+          'Trust me Settings',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         backgroundColor: const Color(0xFF17A2B8),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          // Only show Add button if list is empty (enforcing 1 account limit from UI side too)
           if (_accounts.isEmpty)
             IconButton(
               icon: const Icon(Icons.add),
@@ -176,8 +172,8 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
             ),
         ],
       ),
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator()) 
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -197,7 +193,7 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
                     style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 30),
-                  
+
                   if (_accounts.isEmpty)
                     _buildEmptyState()
                   else
@@ -221,7 +217,11 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
         padding: const EdgeInsets.symmetric(vertical: 40),
         child: Column(
           children: [
-            Icon(Icons.account_tree_outlined, size: 64, color: Colors.grey[300]),
+            Icon(
+              Icons.account_tree_outlined,
+              size: 64,
+              color: Colors.grey[300],
+            ),
             const SizedBox(height: 16),
             Text(
               'No API keys configured.',
@@ -230,9 +230,12 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _showAddAccountDialog,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF17A2B8), foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF17A2B8),
+                foregroundColor: Colors.white,
+              ),
               child: const Text("Configure Now"),
-            )
+            ),
           ],
         ),
       ),
@@ -263,10 +266,14 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
               ],
             ),
             const Divider(),
+            _buildInfoRow("App ID", account['app_id'] ?? ''),
             _buildInfoRow("Phone ID", account['phone_id'] ?? ''),
             _buildInfoRow("Business ID", account['business_id'] ?? ''),
             _buildInfoRow("Mobile", account['mobile_number'] ?? 'Not provided'),
-            _buildInfoRow("Token", "••••••••${(account['token'] ?? '').toString().characters.takeLast(4)}"),
+            _buildInfoRow(
+              "Token",
+              "••••••••${(account['token'] ?? '').toString().characters.takeLast(4)}",
+            ),
           ],
         ),
       ),
@@ -279,11 +286,13 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
       child: Row(
         children: [
           Text("$label: ", style: const TextStyle(fontWeight: FontWeight.w600)),
-          Expanded(child: Text(value, style: TextStyle(color: Colors.grey[700]))),
+          Expanded(
+            child: Text(value, style: TextStyle(color: Colors.grey[700])),
+          ),
           IconButton(
             icon: const Icon(Icons.copy, size: 16),
             onPressed: () => Clipboard.setData(ClipboardData(text: value)),
-          )
+          ),
         ],
       ),
     );
@@ -305,6 +314,15 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
                   border: OutlineInputBorder(),
                   hintText: 'EAAG...',
                 ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _appIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Meta App ID',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
               TextField(
