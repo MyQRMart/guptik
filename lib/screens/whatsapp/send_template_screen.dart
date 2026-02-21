@@ -20,28 +20,41 @@ class SendTemplateScreen extends StatefulWidget {
 class _SendTemplateScreenState extends State<SendTemplateScreen> {
   final _phoneController = TextEditingController();
   final List<TextEditingController> _variableControllers = [];
+
   bool _isSending = false;
+  String _loadingStatus = ''; // Shows "Uploading..." vs "Sending..."
 
   File? _selectedMedia;
   String _mediaUrlFallback =
-      ''; // In case they prefer pasting a link instead of picking a file
+      ''; // For when user pastes a link instead of picking a file
 
   @override
   void initState() {
     super.initState();
+    // Create a text controller for every {{1}}, {{2}} variable the template needs
     for (int i = 0; i < widget.template.requiredBodyVariables; i++) {
       _variableControllers.add(TextEditingController());
     }
   }
 
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    for (var controller in _variableControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
   Future<void> _pickMedia(String format) async {
     FileType type = FileType.any;
-    if (format == 'IMAGE')
+    if (format == 'IMAGE') {
       type = FileType.image;
-    else if (format == 'VIDEO')
+    } else if (format == 'VIDEO') {
       type = FileType.video;
-    else if (format == 'DOCUMENT')
+    } else if (format == 'DOCUMENT') {
       type = FileType.custom;
+    }
 
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: type,
@@ -61,34 +74,51 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
       return;
     }
 
-    setState(() => _isSending = true);
+    setState(() {
+      _isSending = true;
+      _loadingStatus = 'Preparing...';
+    });
+
     final header = widget.template.header;
+    // Check if the template actually needs media
     String? mediaType =
         (header != null &&
             ['IMAGE', 'VIDEO', 'DOCUMENT'].contains(header.format))
         ? header.format
         : null;
 
-    // Logic to determine the media link to send
     String? finalMediaLink;
-    if (mediaType != null) {
-      if (_selectedMedia != null) {
-        // TODO: Upload _selectedMedia to Supabase Storage here and get the URL
-        // finalMediaLink = await SupabaseStorageService.upload(_selectedMedia!);
-        finalMediaLink =
-            'https://dummyimage.com/600x400/000/fff'; // Temporary placeholder
-      } else if (_mediaUrlFallback.isNotEmpty) {
-        finalMediaLink = _mediaUrlFallback;
-      }
-    }
+    String? finalMediaId;
 
     try {
+      // 1. Handle Media Upload if required
+      if (mediaType != null) {
+        if (_selectedMedia != null) {
+          setState(() => _loadingStatus = 'Uploading media to WhatsApp...');
+
+          // REAL UPLOAD: Sends file to Meta and gets a valid Media ID
+          finalMediaId = await widget.apiService.uploadMediaForMessage(
+            _selectedMedia!,
+            mediaType,
+          );
+        } else if (_mediaUrlFallback.isNotEmpty) {
+          // If they pasted a link, we use that
+          finalMediaLink = _mediaUrlFallback;
+        } else {
+          //  throw Exception('Please select an image/video or paste a link.');
+        }
+      }
+
+      // 2. Send the Message
+      setState(() => _loadingStatus = 'Sending message...');
+
       final success = await widget.apiService.sendTemplateMessage(
         targetPhoneNumber: _phoneController.text,
         templateName: widget.template.name,
         languageCode: widget.template.language,
         headerMediaType: mediaType,
-        mediaLink: finalMediaLink,
+        mediaLink: finalMediaLink, // Used if URL pasted
+        mediaId: finalMediaId, // Used if File picked (Priority)
         bodyVariables: _variableControllers.map((c) => c.text).toList(),
       );
 
@@ -99,13 +129,13 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        Navigator.pop(context); // Go back to template list
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send: $e'),
+            content: Text('Failed: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -132,6 +162,7 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // --- Phone Input ---
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
@@ -139,20 +170,23 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
               labelText: 'Recipient Phone Number (e.g. 919876543210)',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.phone),
+              helperText: 'Must include country code (e.g., 91 for India)',
             ),
           ),
           const SizedBox(height: 20),
 
+          // --- Media Picker (Only shows if template needs it) ---
           if (requiresMedia) ...[
             Text(
-              'Requires $headerFormat',
+              'Header Media ($headerFormat)',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
+
             GestureDetector(
               onTap: () => _pickMedia(headerFormat),
               child: Container(
-                height: 150,
+                height: 160,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
@@ -169,12 +203,23 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
                               ),
                             )
                           : Center(
-                              child: Text(
-                                'Selected: ${_selectedMedia!.path.split('/').last}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
-                                ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 40,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _selectedMedia!.path.split('/').last,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             )
                     : Column(
@@ -191,28 +236,31 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Tap to select $headerFormat from device',
+                            'Tap to select $headerFormat',
                             style: TextStyle(color: Colors.grey[600]),
                           ),
                         ],
                       ),
               ),
             ),
+
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.symmetric(vertical: 12),
               child: Center(
                 child: Text(
-                  'OR',
+                  '— OR PASTE LINK —',
                   style: TextStyle(
                     color: Colors.grey,
                     fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
                 ),
               ),
             ),
+
             TextFormField(
               decoration: const InputDecoration(
-                labelText: 'Paste Public URL instead',
+                labelText: 'Public Media URL',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.link),
               ),
@@ -221,9 +269,10 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
             const SizedBox(height: 20),
           ],
 
+          // --- Variable Inputs (Only shows if template has {{1}}, etc) ---
           if (widget.template.requiredBodyVariables > 0) ...[
             const Text(
-              'Variables',
+              'Message Variables',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
@@ -233,8 +282,11 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
                 child: TextFormField(
                   controller: _variableControllers[index],
                   decoration: InputDecoration(
-                    labelText: 'Value for {{${index + 1}}}',
+                    labelText: '{{${index + 1}}}',
+                    hintText: 'Enter value for variable ${index + 1}',
                     border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.grey[50],
                   ),
                 ),
               );
@@ -242,17 +294,39 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
           ],
 
           const SizedBox(height: 24),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.all(16),
+
+          // --- Send Button ---
+          if (_isSending)
+            Column(
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF17A2B8)),
+                const SizedBox(height: 12),
+                Text(
+                  _loadingStatus,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            )
+          else
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: _sendMessage,
+              icon: const Icon(Icons.send),
+              label: const Text(
+                'Send Message',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
-            onPressed: _isSending ? null : _sendMessage,
-            child: _isSending
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text('Send Message', style: TextStyle(fontSize: 16)),
-          ),
         ],
       ),
     );

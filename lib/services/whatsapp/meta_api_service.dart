@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:guptik/models/whatsapp/template_model.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart'; // REQUIRED FOR MEDIA TYPE
+import 'package:guptik/models/whatsapp/template_model.dart'; // Adjust path if needed
 
 class MetaApiService {
   final String accessToken;
@@ -17,17 +18,15 @@ class MetaApiService {
     required this.appId,
   });
 
-  // --- AUTOMATED MEDIA UPLOAD ---
+  // --- AUTOMATED MEDIA UPLOAD (FOR TEMPLATE CREATION) ---
   Future<String> uploadMediaToMeta(File mediaFile, String format) async {
     final int fileLength = await mediaFile.length();
 
-    // Determine MIME type
     String mimeType = 'application/octet-stream';
     if (format == 'IMAGE') mimeType = 'image/jpeg';
     if (format == 'VIDEO') mimeType = 'video/mp4';
     if (format == 'DOCUMENT') mimeType = 'application/pdf';
 
-    // Step 1: Initialize Upload Session
     final sessionUrl = Uri.parse(
       '$baseUrl/$appId/uploads?file_length=$fileLength&file_type=$mimeType',
     );
@@ -36,14 +35,12 @@ class MetaApiService {
       headers: {'Authorization': 'Bearer $accessToken'},
     );
 
-    if (sessionRes.statusCode != 200) {
+    if (sessionRes.statusCode != 200)
       throw Exception('Session Error: ${sessionRes.body}');
-    }
 
     final sessionData = json.decode(sessionRes.body);
     final String sessionId = sessionData['id'];
 
-    // Step 2: Upload File Bytes
     final uploadUrl = Uri.parse('$baseUrl/$sessionId');
     final fileBytes = await mediaFile.readAsBytes();
 
@@ -53,12 +50,46 @@ class MetaApiService {
       body: fileBytes,
     );
 
-    if (uploadRes.statusCode != 200) {
+    if (uploadRes.statusCode != 200)
       throw Exception('Upload Error: ${uploadRes.body}');
-    }
 
     final uploadData = json.decode(uploadRes.body);
-    return uploadData['h']; // Returns the generated header handle
+    return uploadData['h'];
+  }
+
+  // --- UPLOAD MEDIA FOR SENDING A MESSAGE ---
+  Future<String> uploadMediaForMessage(File mediaFile, String format) async {
+    final url = Uri.parse('$baseUrl/$phoneNumberId/media');
+
+    // Label the file correctly so Meta doesn't reject it as 'application/octet-stream'
+    MediaType contentType = MediaType('application', 'octet-stream');
+    if (format == 'IMAGE') {
+      contentType = MediaType('image', 'jpeg');
+    } else if (format == 'VIDEO') {
+      contentType = MediaType('video', 'mp4');
+    } else if (format == 'DOCUMENT') {
+      contentType = MediaType('application', 'pdf');
+    }
+
+    var request = http.MultipartRequest('POST', url)
+      ..headers['Authorization'] = 'Bearer $accessToken'
+      ..fields['messaging_product'] = 'whatsapp'
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          mediaFile.path,
+          contentType: contentType, // THIS FIXES THE ERROR
+        ),
+      );
+
+    var response = await request.send();
+    var responseBody = await response.stream.bytesToString();
+
+    if (response.statusCode == 200) {
+      return json.decode(responseBody)['id']; // Returns the Media ID
+    } else {
+      throw Exception('Media upload failed: $responseBody');
+    }
   }
 
   Future<List<WhatsAppTemplate>> fetchTemplates() async {
@@ -115,9 +146,8 @@ class MetaApiService {
     }
     components.add(body);
 
-    if (footerText.isNotEmpty) {
+    if (footerText.isNotEmpty)
       components.add({'type': 'FOOTER', 'text': footerText});
-    }
 
     final payload = {
       "name": formattedName,
@@ -135,11 +165,8 @@ class MetaApiService {
       body: json.encode(payload),
     );
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return true;
-    } else {
-      throw Exception(response.body);
-    }
+    if (response.statusCode == 200 || response.statusCode == 201) return true;
+    throw Exception(response.body);
   }
 
   Future<bool> sendTemplateMessage({
@@ -148,6 +175,7 @@ class MetaApiService {
     required String languageCode,
     String? headerMediaType,
     String? mediaLink,
+    String? mediaId,
     List<String> bodyVariables = const [],
   }) async {
     final url = Uri.parse('$baseUrl/$phoneNumberId/messages');
@@ -158,25 +186,33 @@ class MetaApiService {
 
     List<Map<String, dynamic>> components = [];
 
-    if (headerMediaType != null &&
-        headerMediaType != 'NONE' &&
-        mediaLink != null) {
-      components.add({
-        "type": "header",
-        "parameters": [
-          {
-            "type": headerMediaType.toLowerCase(),
-            headerMediaType.toLowerCase(): {"link": mediaLink},
-          },
-        ],
-      });
+    if (headerMediaType != null && headerMediaType != 'NONE') {
+      Map<String, dynamic> mediaObj = {};
+
+      // Use the Media ID if we uploaded a file, otherwise use the URL link
+      if (mediaId != null && mediaId.isNotEmpty) {
+        mediaObj = {"id": mediaId};
+      } else if (mediaLink != null && mediaLink.isNotEmpty) {
+        mediaObj = {"link": mediaLink};
+      }
+
+      if (mediaObj.isNotEmpty) {
+        components.add({
+          "type": "header",
+          "parameters": [
+            {
+              "type": headerMediaType.toLowerCase(),
+              headerMediaType.toLowerCase(): mediaObj,
+            },
+          ],
+        });
+      }
     }
 
     if (bodyVariables.isNotEmpty) {
-      List<Map<String, dynamic>> bodyParams = bodyVariables.map((val) {
-        return {"type": "text", "text": val};
-      }).toList();
-
+      List<Map<String, dynamic>> bodyParams = bodyVariables
+          .map((val) => {"type": "text", "text": val})
+          .toList();
       components.add({"type": "body", "parameters": bodyParams});
     }
 
@@ -200,10 +236,7 @@ class MetaApiService {
       body: json.encode(payload),
     );
 
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      throw Exception(response.body);
-    }
+    if (response.statusCode == 200) return true;
+    throw Exception(response.body);
   }
 }
