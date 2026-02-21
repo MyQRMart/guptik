@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // REQUIRED FOR MEDIA TYPE
 import 'package:guptik/models/whatsapp/template_model.dart'; // Adjust path if needed
@@ -236,7 +237,38 @@ class MetaApiService {
       body: json.encode(payload),
     );
 
-    if (response.statusCode == 200) return true;
-    throw Exception(response.body);
+    if (response.statusCode == 200) {
+      // Optionally log the response for debugging
+      try {
+        final respJson = json.decode(response.body);
+        if (respJson['messages'] != null) {
+          // Message sent successfully, log message IDs
+          debugPrint(
+            'WhatsApp API: Message sent. IDs: \\${respJson['messages']}',
+          );
+        } else {
+          debugPrint(
+            'WhatsApp API: Success response but no messages field: \\${response.body}',
+          );
+        }
+      } catch (e) {
+        debugPrint(
+          'WhatsApp API: Success but response not JSON: \\${response.body}',
+        );
+      }
+      return true;
+    } else {
+      // Log detailed error info
+      debugPrint('WhatsApp API ERROR: Status: \\${response.statusCode}');
+      debugPrint('Request URL: $url');
+      debugPrint(
+        'Request Headers: \\${{'Authorization': 'Bearer $accessToken', 'Content-Type': 'application/json'}}',
+      );
+      debugPrint('Request Body: \\${json.encode(payload)}');
+      debugPrint('Response Body: \\${response.body}');
+      throw Exception(
+        'WhatsApp API Error: Status: \\${response.statusCode}, Body: \\${response.body}',
+      );
+    }
   }
 }

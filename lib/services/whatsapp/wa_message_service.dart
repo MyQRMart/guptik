@@ -6,11 +6,11 @@ import 'package:guptik/models/whatsapp/wa_message.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 // THIS IS THE MISSING IMPORT
-import 'package:path_provider/path_provider.dart'; 
+import 'package:path_provider/path_provider.dart';
 
 class MessageService {
   final SupabaseClient _supabase = Supabase.instance.client;
-  
+
   // Cache for token to avoid fetching on every image load
   String? _cachedAccessToken;
   DateTime? _tokenExpiry;
@@ -18,7 +18,9 @@ class MessageService {
   // NEW: Get Access Token for Media Display
   Future<String?> getAccessToken() async {
     // Return cached token if valid (simple cache mechanism)
-    if (_cachedAccessToken != null && _tokenExpiry != null && DateTime.now().isBefore(_tokenExpiry!)) {
+    if (_cachedAccessToken != null &&
+        _tokenExpiry != null &&
+        DateTime.now().isBefore(_tokenExpiry!)) {
       return _cachedAccessToken;
     }
 
@@ -37,15 +39,13 @@ class MessageService {
       final token = await getAccessToken();
       if (token == null) return null;
 
-      final headers = {
-        'Authorization': 'Bearer $token',
-      };
+      final headers = {'Authorization': 'Bearer $token'};
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      
+
       if (response.statusCode == 200) {
         // Now this will work because path_provider is imported
-        final dir = await getTemporaryDirectory(); 
+        final dir = await getTemporaryDirectory();
         final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
         return file;
@@ -67,12 +67,14 @@ class MessageService {
 
       final response = await _supabase
           .from('user_api_settings')
-          .select('whatsapp_access_token, meta_wa_phone_number_id, mobile_number')
+          .select(
+            'whatsapp_access_token, meta_wa_phone_number_id, mobile_number',
+          )
           .eq('user_id', userId)
           .maybeSingle();
 
-      if (response == null || 
-          response['whatsapp_access_token'] == null || 
+      if (response == null ||
+          response['whatsapp_access_token'] == null ||
           response['meta_wa_phone_number_id'] == null) {
         debugPrint('Missing WhatsApp credentials');
         return null;
@@ -97,15 +99,13 @@ class MessageService {
   }) async {
     try {
       final response = await _supabase
-          .from('messages')
+          .from('wa_messages')
           .select()
           .eq('conversation_id', conversationId)
           .order('timestamp', ascending: ascending)
           .limit(limit);
 
-      return (response as List)
-          .map((json) => Message.fromJson(json))
-          .toList();
+      return (response as List).map((json) => Message.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Error getting messages: $e');
       throw Exception('Failed to fetch messages: $e');
@@ -125,13 +125,14 @@ class MessageService {
       if (userId == null) {
         throw Exception('User not authenticated');
       }
-      
-      final messageId = 'msg_${DateTime.now().millisecondsSinceEpoch}_${userId.substring(0, 8)}';
+
+      final messageId =
+          'msg_${DateTime.now().millisecondsSinceEpoch}_${userId.substring(0, 8)}';
       final now = DateTime.now().toUtc();
-      
+
       // 1. Insert message to database
       final message = await _supabase
-          .from('messages')
+          .from('wa_messages')
           .insert({
             'conversation_id': conversationId,
             'message_id': messageId,
@@ -163,9 +164,9 @@ class MessageService {
 
       // 3. Update status based on WhatsApp result
       final updatedStatus = whatsappSent ? 'sent' : 'failed';
-      
+
       await _supabase
-          .from('messages')
+          .from('wa_messages')
           .update({
             'status': updatedStatus,
             'status_timestamp': now.toIso8601String(),
@@ -185,7 +186,6 @@ class MessageService {
         'status': updatedStatus,
         'status_timestamp': now.toIso8601String(),
       });
-
     } catch (e) {
       debugPrint('Error in sendTextMessage: $e');
       throw Exception('Failed to send message: $e');
@@ -209,8 +209,10 @@ class MessageService {
       final phoneNumberId = credentials['phone_number_id'];
       final cleanPhoneNumber = toPhoneNumber.replaceAll(RegExp(r'[+\s]'), '');
 
-      final url = Uri.parse('https://graph.facebook.com/v23.0/$phoneNumberId/messages');
-      
+      final url = Uri.parse(
+        'https://graph.facebook.com/v23.0/$phoneNumberId/messages',
+      );
+
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
@@ -221,10 +223,7 @@ class MessageService {
         'recipient_type': 'individual',
         'to': cleanPhoneNumber,
         'type': 'text',
-        'text': {
-          'preview_url': previewUrl,
-          'body': content,
-        },
+        'text': {'preview_url': previewUrl, 'body': content},
       };
 
       final response = await http.post(
@@ -253,19 +252,15 @@ class MessageService {
   }) async {
     try {
       debugPrint('Uploading media: $fileName');
-      
+
       final url = Uri.parse('https://uploadservice.myqrmart.com/upload');
-      
+
       // Create multipart request
       final request = http.MultipartRequest('POST', url);
-      
+
       // Add file
       request.files.add(
-        await http.MultipartFile.fromPath(
-          'file',
-          filePath,
-          filename: fileName,
-        ),
+        await http.MultipartFile.fromPath('file', filePath, filename: fileName),
       );
 
       // Send request
@@ -274,7 +269,7 @@ class MessageService {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(responseBody);
-        
+
         // Parse response
         Map<String, dynamic> result;
         if (responseData is List && responseData.isNotEmpty) {
@@ -282,13 +277,14 @@ class MessageService {
         } else {
           result = Map<String, dynamic>.from(responseData);
         }
-        
+
         if (result['success'] == true || result['success'] == 'true') {
           final fileData = Map<String, dynamic>.from(result['file']);
-          final mediaUrl = fileData['url']?.toString() ?? 
-                          fileData['browserUrl']?.toString() ??
-                          'https://uploadservice.myqrmart.com/u/${fileData['filename']}';
-          
+          final mediaUrl =
+              fileData['url']?.toString() ??
+              fileData['browserUrl']?.toString() ??
+              'https://uploadservice.myqrmart.com/u/${fileData['filename']}';
+
           return {
             'success': true,
             'url': mediaUrl,
@@ -322,24 +318,27 @@ class MessageService {
       if (userId == null) {
         throw Exception('User not authenticated');
       }
-      
-      final messageId = 'msg_${DateTime.now().millisecondsSinceEpoch}_${userId.substring(0, 8)}';
+
+      final messageId =
+          'msg_${DateTime.now().millisecondsSinceEpoch}_${userId.substring(0, 8)}';
       final now = DateTime.now().toUtc();
-      
+
       // Prepare media info
-      final Map<String, dynamic> finalMediaInfo = mediaInfo ?? {
-        'url': mediaUrl,
-        'type': messageType,
-        'uploaded_at': now.toIso8601String(),
-      };
-      
+      final Map<String, dynamic> finalMediaInfo =
+          mediaInfo ??
+          {
+            'url': mediaUrl,
+            'type': messageType,
+            'uploaded_at': now.toIso8601String(),
+          };
+
       if (mediaInfo != null) {
         finalMediaInfo.addAll(mediaInfo);
       }
 
       // 1. Insert to database
       final message = await _supabase
-          .from('messages')
+          .from('wa_messages')
           .insert({
             'conversation_id': conversationId,
             'message_id': messageId,
@@ -373,9 +372,9 @@ class MessageService {
 
       // 3. Update status
       final updatedStatus = whatsappSent ? 'sent' : 'failed';
-      
+
       await _supabase
-          .from('messages')
+          .from('wa_messages')
           .update({
             'status': updatedStatus,
             'status_timestamp': now.toIso8601String(),
@@ -384,11 +383,14 @@ class MessageService {
           .eq('message_id', messageId);
 
       // 4. Update conversation
-      final displayMessage = messageType == 'image' ? '📸 Photo' : 
-                           messageType == 'video' ? '🎥 Video' : 
-                           messageType == 'audio' ? '🎤 Audio' : 
-                           '📎 Media';
-      
+      final displayMessage = messageType == 'image'
+          ? '📸 Photo'
+          : messageType == 'video'
+          ? '🎥 Video'
+          : messageType == 'audio'
+          ? '🎤 Audio'
+          : '📎 Media';
+
       await _updateConversationLastMessage(conversationId, displayMessage);
 
       if (!whatsappSent) {
@@ -400,7 +402,6 @@ class MessageService {
         'status': updatedStatus,
         'status_timestamp': now.toIso8601String(),
       });
-
     } catch (e) {
       debugPrint('Error in sendMediaMessage: $e');
       throw Exception('Failed to send media message: $e');
@@ -425,8 +426,10 @@ class MessageService {
       final phoneNumberId = credentials['phone_number_id'];
       final cleanPhoneNumber = toPhoneNumber.replaceAll(RegExp(r'[+\s]'), '');
 
-      final url = Uri.parse('https://graph.facebook.com/v23.0/$phoneNumberId/messages');
-      
+      final url = Uri.parse(
+        'https://graph.facebook.com/v23.0/$phoneNumberId/messages',
+      );
+
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
@@ -464,7 +467,7 @@ class MessageService {
       } else {
         debugPrint('WhatsApp Media API Error: ${response.body}');
         return false;
-    }
+      }
     } catch (e) {
       debugPrint('Error in WhatsApp media API: $e');
       return false;
@@ -478,7 +481,7 @@ class MessageService {
   ) async {
     try {
       await _supabase
-          .from('conversations')
+          .from('wa_conversations')
           .update({
             'last_message': lastMessage,
             'last_message_time': DateTime.now().toIso8601String(),
@@ -495,7 +498,7 @@ class MessageService {
   Future<void> markMessagesAsRead(String conversationId) async {
     try {
       await _supabase
-          .from('messages')
+          .from('wa_messages')
           .update({
             'status': 'read',
             'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -516,10 +519,7 @@ class MessageService {
   // Delete message
   Future<void> deleteMessage(String messageId) async {
     try {
-      await _supabase
-          .from('messages')
-          .delete()
-          .eq('message_id', messageId);
+      await _supabase.from('wa_messages').delete().eq('message_id', messageId);
     } catch (e) {
       debugPrint('Error deleting message: $e');
       throw Exception('Failed to delete message: $e');
@@ -530,7 +530,7 @@ class MessageService {
   Future<int> getUnreadCount(String conversationId) async {
     try {
       final response = await _supabase
-          .from('messages')
+          .from('wa_messages')
           .select('id')
           .eq('conversation_id', conversationId)
           .eq('direction', 'incoming')
@@ -543,17 +543,15 @@ class MessageService {
     }
   }
 
-
   // Check if WhatsApp is configured
   Future<bool> hasWhatsAppConfigured() async {
     final credentials = await _getWhatsAppCredentials();
-    return credentials != null && 
-           credentials['access_token'] != null && 
-           credentials['phone_number_id'] != null;
+    return credentials != null &&
+        credentials['access_token'] != null &&
+        credentials['phone_number_id'] != null;
   }
 
-   
-    // Retry failed message
+  // Retry failed message
   Future<void> retryFailedMessage(String messageId) async {
     debugPrint('Retry message $messageId - Feature not implemented yet');
   }

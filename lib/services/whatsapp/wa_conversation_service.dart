@@ -18,20 +18,18 @@ class ConversationService {
           .from('conversations')
           .select()
           .order('last_message_time', ascending: false);
-          
+
       debugPrint('Fetched ${data.length} conversations');
-      return (data as List)
-          .map((item) {
-            try {
-              return Conversation.fromMap(item);
-            } catch (e, stack) {
-              debugPrint('Error parsing conversation item: $e');
-              debugPrint('Stack: $stack');
-              debugPrint('Item data: ${jsonEncode(item)}');
-              rethrow;
-            }
-          })
-          .toList();
+      return (data as List).map((item) {
+        try {
+          return Conversation.fromMap(item);
+        } catch (e, stack) {
+          debugPrint('Error parsing conversation item: $e');
+          debugPrint('Stack: $stack');
+          debugPrint('Item data: ${jsonEncode(item)}');
+          rethrow;
+        }
+      }).toList();
     } catch (e) {
       debugPrint('Error in getConversations: $e');
       throw Exception('Failed to fetch conversations: $e');
@@ -42,15 +40,13 @@ class ConversationService {
     try {
       debugPrint('Fetching individual conversations...');
       final data = await _client
-          .from('conversations')
+          .from('wa_conversations')
           .select()
           .eq('is_archived', false)
           .order('last_message_time', ascending: false);
-          
+
       debugPrint('Fetched ${data.length} individual conversations');
-      return (data as List)
-          .map((item) => Conversation.fromMap(item))
-          .toList();
+      return (data as List).map((item) => Conversation.fromMap(item)).toList();
     } catch (e) {
       debugPrint('Error in getIndividualConversations: $e');
       throw Exception('Failed to fetch individual conversations: $e');
@@ -61,16 +57,14 @@ class ConversationService {
     try {
       debugPrint('Fetching group conversations...');
       final data = await _client
-          .from('conversations')
+          .from('wa_conversations')
           .select()
           .eq('is_archived', false)
           .filter('ai_agent_id', 'not.is', null)
           .order('last_message_time', ascending: false);
-          
+
       debugPrint('Fetched ${data.length} group conversations');
-      return (data as List)
-          .map((item) => Conversation.fromMap(item))
-          .toList();
+      return (data as List).map((item) => Conversation.fromMap(item)).toList();
     } catch (e) {
       debugPrint('Error in getGroupConversations: $e');
       throw Exception('Failed to fetch group conversations: $e');
@@ -81,11 +75,8 @@ class ConversationService {
     try {
       debugPrint('Marking conversation $conversationId as read');
       await _client
-          .from('conversations')
-          .update({
-            'is_unread': false, 
-            'updated_at': _getUtcTimestamp()
-          })
+          .from('wa_conversations')
+          .update({'is_unread': false, 'updated_at': _getUtcTimestamp()})
           .eq('id', conversationId);
       debugPrint('Successfully marked as read');
     } catch (e) {
@@ -101,13 +92,13 @@ class ConversationService {
   }) async {
     try {
       debugPrint('Updating last message for conversation $conversationId');
-      
+
       final currentTime = DateTime.now();
       final utcTime = currentTime.toUtc().toIso8601String();
       final localTimeForText = currentTime.toIso8601String();
-      
+
       await _client
-          .from('conversations')
+          .from('wa_conversations')
           .update({
             'last_message': message,
             'last_message_time': localTimeForText,
@@ -115,7 +106,7 @@ class ConversationService {
             'is_unread': fromUser,
           })
           .eq('id', conversationId);
-          
+
       debugPrint('Successfully updated last message');
     } catch (e) {
       debugPrint('Error updating last message: $e');
@@ -131,28 +122,28 @@ class ConversationService {
     try {
       debugPrint('Updating AI agent status for $conversationId to $aiEnabled');
       await _client
-        .from('conversations')
-        .update({
-          'ai_agent_id': aiEnabled ? defaultAgentId : null,
-          'updated_at': _getUtcTimestamp(),
-        })
-        .eq('id', conversationId);
+          .from('conversations')
+          .update({
+            'ai_agent_id': aiEnabled ? defaultAgentId : null,
+            'updated_at': _getUtcTimestamp(),
+          })
+          .eq('id', conversationId);
       debugPrint('Successfully updated AI agent status');
     } catch (e) {
       debugPrint('Error updating AI agent status: $e');
       throw Exception('Failed to update AI agent status: $e');
     }
   }
-  
+
   Future<bool> getAIAgentStatus(String conversationId) async {
     try {
       debugPrint('Getting AI agent status for $conversationId');
       final response = await _client
-        .from('conversations')
-        .select('ai_agent_id')
-        .eq('id', conversationId)
-        .single();
-      
+          .from('wa_conversations')
+          .select('ai_agent_id')
+          .eq('id', conversationId)
+          .single();
+
       final hasAgent = response['ai_agent_id'] != null;
       debugPrint('AI agent status: $hasAgent');
       return hasAgent;
@@ -166,11 +157,11 @@ class ConversationService {
     try {
       debugPrint('Getting conversation by ID: $conversationId');
       final response = await _client
-        .from('conversations')
-        .select()
-        .eq('id', conversationId)
-        .single();
-      
+          .from('wa_conversations')
+          .select()
+          .eq('id', conversationId)
+          .single();
+
       return Conversation.fromMap(response);
     } catch (e) {
       debugPrint('Error getting conversation by ID: $e');
@@ -187,7 +178,7 @@ class ConversationService {
   //         .select()
   //         .or('phone_number.ilike.%$query%,contact_name.ilike.%$query%')
   //         .order('last_message_time', ascending: false);
-          
+
   //     debugPrint('Found ${data.length} conversations');
   //     return (data as List)
   //         .map((item) => Conversation.fromMap(item))
@@ -206,7 +197,7 @@ class ConversationService {
   //         .select('id', count: CountOption.exact)
   //         .eq('is_unread', true)
   //         .eq('is_archived', false);
-      
+
   //     final count = data.length;
   //     debugPrint('Unread conversations count: $count');
   //     return count;

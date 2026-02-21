@@ -32,7 +32,6 @@ import 'package:guptik/services/dashboard/conversations_service.dart';
 import 'package:guptik/screens/dashboard/business_settings_screen.dart';
 import 'package:guptik/screens/whatsapp/main_whatsapp_screen.dart';
 
-
 // Custom overflow-safe Row widget to prevent ALL overflow errors
 class SafeRow extends StatelessWidget {
   final MainAxisAlignment mainAxisAlignment;
@@ -89,11 +88,8 @@ class ResponsiveRow extends StatelessWidget {
             children: children,
           );
         }
-        
-        return Row(
-          crossAxisAlignment: crossAxisAlignment,
 
-        );
+        return Row(crossAxisAlignment: crossAxisAlignment);
       },
     );
   }
@@ -108,26 +104,30 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  
+
   // Live Data State
   DashboardData? _dashboardData;
   bool _isLoading = true;
   String? _error;
   final int _maxRetries = 3;
-  
+
   // WhatsApp Business Service
   final WhatsAppBusinessService _whatsappService = WhatsAppBusinessService();
-  
+
   // Conversations Service
   final ConversationsService _conversationsService = ConversationsService();
-  
+
   // Get current user from Supabase
   User? get _currentUser => Supabase.instance.client.auth.currentUser;
-  
+
   final List<DashboardSection> _sections = [
-    DashboardSection(icon: Icons.dashboard, title: 'Dashboard', isSelected: true),
     DashboardSection(
-      icon: Icons.library_books, 
+      icon: Icons.dashboard,
+      title: 'Dashboard',
+      isSelected: true,
+    ),
+    DashboardSection(
+      icon: Icons.library_books,
       title: 'Content Library',
       subSections: [
         SubSection(title: 'Message Templates', icon: Icons.message),
@@ -136,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     ),
     DashboardSection(
-      icon: Icons.contacts, 
+      icon: Icons.contacts,
       title: 'Contacts',
       subSections: [
         SubSection(title: 'Contacts', icon: Icons.person),
@@ -147,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     ),
     DashboardSection(
-      icon: Icons.notifications, 
+      icon: Icons.notifications,
       title: 'Notifications',
       subSections: [
         SubSection(title: 'Notifications', icon: Icons.notifications),
@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     ),
     DashboardSection(
-      icon: Icons.autorenew, 
+      icon: Icons.autorenew,
       title: 'Automations',
       subSections: [
         SubSection(title: 'Basic', icon: Icons.play_arrow),
@@ -165,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     ),
     DashboardSection(
-      icon: Icons.analytics, 
+      icon: Icons.analytics,
       title: 'Analytics & Reports',
       subSections: [
         SubSection(title: 'Messaging', icon: Icons.message),
@@ -202,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
       final data = await _whatsappService.getLiveDashboardData();
-      
+
       if (mounted) {
         setState(() {
           _dashboardData = data;
@@ -211,27 +211,29 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final isNetworkError = e.toString().contains('network') || 
-                               e.toString().contains('timeout') ||
-                               e.toString().contains('connection');
-        
+        final isNetworkError =
+            e.toString().contains('network') ||
+            e.toString().contains('timeout') ||
+            e.toString().contains('connection');
+
         if (isNetworkError && attemptCount < _maxRetries) {
           // Exponential backoff: 2^attemptCount * 2 seconds
           final delaySeconds = (2 << attemptCount) * 2;
-          
+
           setState(() {
-            _error = 'Connection issue. Retrying in $delaySeconds seconds... (${attemptCount + 1}/$_maxRetries)';
+            _error =
+                'Connection issue. Retrying in $delaySeconds seconds... (${attemptCount + 1}/$_maxRetries)';
             _isLoading = false;
           });
-          
+
           Future.delayed(Duration(seconds: delaySeconds), () {
             if (mounted) _loadLiveDataWithRetry(attemptCount + 1);
           });
         } else {
           setState(() {
-            _error = attemptCount >= _maxRetries 
-              ? 'Failed to load data after $_maxRetries attempts. Please check your connection and try again.'
-              : 'Failed to load live data: $e';
+            _error = attemptCount >= _maxRetries
+                ? 'Failed to load data after $_maxRetries attempts. Please check your connection and try again.'
+                : 'Failed to load live data: $e';
             _isLoading = false;
           });
         }
@@ -364,7 +366,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Professional',
                 '\$49/month',
                 'Best for growing businesses',
-                ['25,000 messages/month', 'Advanced analytics', 'Priority support', 'AI automation'],
+                [
+                  '25,000 messages/month',
+                  'Advanced analytics',
+                  'Priority support',
+                  'AI automation',
+                ],
                 true,
               ),
               const SizedBox(height: 16),
@@ -372,7 +379,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Enterprise',
                 '\$99/month',
                 'For large organizations',
-                ['Unlimited messages', 'Custom integrations', 'Dedicated manager', 'White-label options'],
+                [
+                  'Unlimited messages',
+                  'Custom integrations',
+                  'Dedicated manager',
+                  'White-label options',
+                ],
                 false,
               ),
             ],
@@ -388,7 +400,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPlanOption(String name, String price, String description, List<String> features, bool isRecommended) {
+  Widget _buildPlanOption(
+    String name,
+    String price,
+    String description,
+    List<String> features,
+    bool isRecommended,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -416,7 +434,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: isRecommended ? Colors.orange : Colors.black87,
+                              color: isRecommended
+                                  ? Colors.orange
+                                  : Colors.black87,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -424,7 +444,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (isRecommended) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.orange,
                               borderRadius: BorderRadius.circular(12),
@@ -443,10 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     Text(
                       description,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -463,26 +483,28 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          ...features.map((feature) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  size: 16,
-                  color: isRecommended ? Colors.orange : Colors.green,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    feature,
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
+          ...features.map(
+            (feature) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: isRecommended ? Colors.orange : Colors.green,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      feature,
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          )),
+          ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -492,13 +514,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 _selectPlan(name, price);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: isRecommended ? Colors.orange : Colors.grey[600],
+                backgroundColor: isRecommended
+                    ? Colors.orange
+                    : Colors.grey[600],
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
               child: Text(
                 'Select $name',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -510,7 +537,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _selectPlan(String planName, String price) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Selected $planName plan ($price). Redirecting to payment...'),
+        content: Text(
+          'Selected $planName plan ($price). Redirecting to payment...',
+        ),
         backgroundColor: Colors.orange,
         action: SnackBarAction(
           label: 'PROCEED',
@@ -531,8 +560,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return AlertDialog(
           contentPadding: EdgeInsets.zero,
           content: SizedBox(
-            width: MediaQuery.of(context).size.width < 400 
-                ? MediaQuery.of(context).size.width * 0.9 
+            width: MediaQuery.of(context).size.width < 400
+                ? MediaQuery.of(context).size.width * 0.9
                 : 320,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -547,7 +576,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         backgroundColor: const Color(0xFF17A2B8),
                         child: Text(
                           _getInitials(_getUserDisplayName()),
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -578,26 +611,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                
+
                 const Divider(height: 1),
-                
+
                 // Menu Items
                 _buildProfileMenuItem(Icons.person_outline, 'My Account'),
                 _buildProfileMenuItem(Icons.phone_android, 'WhatsApp Numbers'),
                 _buildProfileMenuItem(Icons.facebook, 'Facebook & Instagram'),
-                
+
                 const Divider(height: 1),
-                
+
                 _buildProfileMenuItem(Icons.api, 'API Configuration'),
                 _buildProfileMenuItem(Icons.webhook, 'Webhook Configuration'),
                 _buildProfileMenuItem(Icons.extension, 'Integrations'),
                 _buildProfileMenuItem(Icons.card_giftcard, 'Refer and Earn'),
                 _buildProfileMenuItem(Icons.bug_report_outlined, 'Report Bug'),
-                
+
                 const Divider(height: 1),
-                
-                _buildProfileMenuItem(Icons.logout, 'Log Out', isDestructive: true),
-                
+
+                _buildProfileMenuItem(
+                  Icons.logout,
+                  'Log Out',
+                  isDestructive: true,
+                ),
+
                 const SizedBox(height: 8),
               ],
             ),
@@ -607,7 +644,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildProfileMenuItem(IconData icon, String title, {bool isDestructive = false}) {
+  Widget _buildProfileMenuItem(
+    IconData icon,
+    String title, {
+    bool isDestructive = false,
+  }) {
     return InkWell(
       onTap: () {
         Navigator.of(context).pop();
@@ -677,7 +718,9 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out of your account?'),
+        content: const Text(
+          'Are you sure you want to sign out of your account?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -688,7 +731,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // Store context before async operation
               final navigator = Navigator.of(context);
               final messenger = ScaffoldMessenger.of(context);
-              
+
               navigator.pop();
               try {
                 await Supabase.instance.client.auth.signOut();
@@ -716,7 +759,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _getInitials(String name) {
     if (name.isEmpty) return 'U';
-    
+
     List<String> nameParts = name.trim().split(' ');
     if (nameParts.length == 1) {
       return nameParts[0][0].toUpperCase();
@@ -726,10 +769,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _getUserDisplayName() {
-    return _dashboardData?.businessProfile?.displayName ?? 
-           _currentUser?.userMetadata?['full_name'] ?? 
-           _currentUser?.email?.split('@')[0] ?? 
-           'Business User';
+    return _dashboardData?.businessProfile?.displayName ??
+        _currentUser?.userMetadata?['full_name'] ??
+        _currentUser?.email?.split('@')[0] ??
+        'Business User';
   }
 
   String _getUserEmail() {
@@ -749,50 +792,63 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildMenuItem(int flatIndex) {
     int currentIndex = 0;
-    
-    for (int sectionIndex = 0; sectionIndex < _sections.length; sectionIndex++) {
+
+    for (
+      int sectionIndex = 0;
+      sectionIndex < _sections.length;
+      sectionIndex++
+    ) {
       final section = _sections[sectionIndex];
-      
+
       // Main section item
       if (currentIndex == flatIndex) {
         return _buildMainMenuItem(section, sectionIndex);
       }
       currentIndex++;
-      
+
       // Sub section items (if expanded)
       if (section.isExpanded && section.subSections != null) {
-        for (int subIndex = 0; subIndex < section.subSections!.length; subIndex++) {
+        for (
+          int subIndex = 0;
+          subIndex < section.subSections!.length;
+          subIndex++
+        ) {
           if (currentIndex == flatIndex) {
-            return _buildSubMenuItem(section.subSections![subIndex], sectionIndex, subIndex);
+            return _buildSubMenuItem(
+              section.subSections![subIndex],
+              sectionIndex,
+              subIndex,
+            );
           }
           currentIndex++;
         }
       }
     }
-    
+
     return const SizedBox.shrink(); // Fallback
   }
 
   Widget _buildMainMenuItem(DashboardSection section, int sectionIndex) {
     final isSelected = sectionIndex == _selectedIndex;
-    final hasSubSections = section.subSections != null && section.subSections!.isNotEmpty;
-    
+    final hasSubSections =
+        section.subSections != null && section.subSections!.isNotEmpty;
+
     return Container(
       constraints: const BoxConstraints(minHeight: 44),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: ListTile(
         dense: true,
         leading: Icon(
-          section.icon, 
-          color: isSelected ? const Color(0xFF17A2B8) : Colors.white70, 
-          size: 20
+          section.icon,
+          color: isSelected ? const Color(0xFF17A2B8) : Colors.white70,
+          size: 20,
         ),
         title: Text(
-          section.title, 
+          section.title,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF17A2B8) : Colors.white70, 
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal, 
-            fontSize: 14
+            color: isSelected ? const Color(0xFF17A2B8) : Colors.white70,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            fontSize: 14,
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -837,7 +893,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             }
           });
-          
+
           // Close drawer on mobile when item is tapped
           if (MediaQuery.of(context).size.width < 768) {
             Navigator.pop(context);
@@ -848,7 +904,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSubMenuItem(SubSection subSection, int sectionIndex, int subIndex) {
+  Widget _buildSubMenuItem(
+    SubSection subSection,
+    int sectionIndex,
+    int subIndex,
+  ) {
     return Container(
       constraints: const BoxConstraints(minHeight: 40),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -859,19 +919,25 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             if (subSection.icon != null) ...[
               Icon(
-                subSection.icon!, 
-                color: subSection.isSelected ? const Color(0xFF17A2B8) : Colors.white60, 
-                size: 16
+                subSection.icon!,
+                color: subSection.isSelected
+                    ? const Color(0xFF17A2B8)
+                    : Colors.white60,
+                size: 16,
               ),
               const SizedBox(width: 8),
             ],
             Expanded(
               child: Text(
-                subSection.title, 
+                subSection.title,
                 style: TextStyle(
-                  color: subSection.isSelected ? const Color(0xFF17A2B8) : Colors.white60, 
-                  fontWeight: subSection.isSelected ? FontWeight.w600 : FontWeight.normal, 
-                  fontSize: 13
+                  color: subSection.isSelected
+                      ? const Color(0xFF17A2B8)
+                      : Colors.white60,
+                  fontWeight: subSection.isSelected
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                  fontSize: 13,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -897,7 +963,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Select this sub section
             subSection.isSelected = true;
           });
-          
+
           // Close drawer on mobile when item is tapped
           if (MediaQuery.of(context).size.width < 768) {
             Navigator.pop(context);
@@ -925,13 +991,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
                         // Hamburger menu for mobile
                         IconButton(
-                          icon: const Icon(Icons.menu, color: Colors.grey, size: 24),
+                          icon: const Icon(
+                            Icons.menu,
+                            color: Colors.grey,
+                            size: 24,
+                          ),
                           onPressed: () {
                             _scaffoldKey.currentState?.openDrawer();
                           },
@@ -939,8 +1015,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _getCurrentTitle(), 
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
+                            _getCurrentTitle(),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -950,15 +1030,32 @@ class _HomeScreenState extends State<HomeScreen> {
                             onTap: _showUpgradePlanDialog,
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(20)),
-                              child: const Text('Upgrade', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Upgrade',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         IconButton(
-                          icon: const Icon(Icons.notifications_outlined, color: Colors.grey, size: 20),
+                          icon: const Icon(
+                            Icons.notifications_outlined,
+                            color: Colors.grey,
+                            size: 20,
+                          ),
                           onPressed: () {},
                         ),
                         const SizedBox(width: 8),
@@ -970,24 +1067,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             backgroundColor: const Color(0xFF17A2B8),
                             child: Text(
                               _getInitials(_getUserDisplayName()),
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-            
+
                   // Content Area for Mobile
-                  Expanded(
-                    child: _buildCurrentContent(),
-                  ),  
+                  Expanded(child: _buildCurrentContent()),
                 ],
               ),
             ),
           );
         }
-        
+
         // For desktop/tablet, use sidebar layout (ORIGINAL CODE)
         return Scaffold(
           backgroundColor: Colors.grey[50],
@@ -1006,19 +1105,27 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.all(20),
                           child: const Row(
                             children: [
-                              Icon(Icons.chat_bubble_outline, color: Colors.white, size: 28),
+                              Icon(
+                                Icons.chat_bubble_outline,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                               SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'Meta Fly', 
-                                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                  'Meta Fly',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                                
+
                         // Business Account Info
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1035,13 +1142,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                   CircleAvatar(
                                     radius: 12,
                                     backgroundColor: Colors.orange,
-                                    child: Icon(Icons.store, color: Colors.white, size: 16),
+                                    child: Icon(
+                                      Icons.store,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      _dashboardData?.businessProfile?.displayName ?? 'Business Name', 
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                      _dashboardData
+                                              ?.businessProfile
+                                              ?.displayName ??
+                                          'Business Name',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -1049,16 +1166,20 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _dashboardData?.businessProfile?.phoneNumber ?? 'Phone Number', 
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                _dashboardData?.businessProfile?.phoneNumber ??
+                                    'Phone Number',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                                
+
                         const SizedBox(height: 20),
-                                
+
                         // Navigation Menu
                         Expanded(
                           child: ListView.builder(
@@ -1072,7 +1193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-            
+
                 // Main Content (ORIGINAL CODE)
                 Expanded(
                   child: Column(
@@ -1083,14 +1204,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withValues(alpha: 0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [
                             Expanded(
                               child: Text(
-                                _getCurrentTitle(), 
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
+                                _getCurrentTitle(),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1100,14 +1231,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onTap: _showUpgradePlanDialog,
                                 borderRadius: BorderRadius.circular(20),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(20)),
-                                  child: const Text('Upgrade', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text(
+                                    'Upgrade',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Icon(Icons.notifications_outlined, color: Colors.grey, size: 20),
+                            const Icon(
+                              Icons.notifications_outlined,
+                              color: Colors.grey,
+                              size: 20,
+                            ),
                             const SizedBox(width: 8),
                             InkWell(
                               onTap: _showProfileMenu,
@@ -1117,18 +1265,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                 backgroundColor: const Color(0xFF17A2B8),
                                 child: Text(
                                   _getInitials(_getUserDisplayName()),
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-            
-                      // Content Area  
-                      Expanded(
-                        child: _buildCurrentContent(),
-                      ),  
+
+                      // Content Area
+                      Expanded(child: _buildCurrentContent()),
                     ],
                   ),
                 ),
@@ -1153,11 +1303,19 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(20),
               child: const Row(
                 children: [
-                  Icon(Icons.chat_bubble_outline, color: Colors.white, size: 28),
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                   SizedBox(width: 12),
                   Text(
-                    'Meta Fly', 
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    'Meta Fly',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1184,8 +1342,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _dashboardData?.businessProfile?.displayName ?? 'Business Name', 
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          _dashboardData?.businessProfile?.displayName ??
+                              'Business Name',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1193,7 +1355,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _dashboardData?.businessProfile?.phoneNumber ?? 'Phone Number', 
+                    _dashboardData?.businessProfile?.phoneNumber ??
+                        'Phone Number',
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1229,7 +1392,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     }
-    
+
     // Return main section title
     if (_selectedIndex >= 0 && _selectedIndex < _sections.length) {
       // Show "Conversations" when Inbox is selected (matching the image)
@@ -1238,7 +1401,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return _sections[_selectedIndex].title;
     }
-    
+
     return 'Dashboard'; // Default
   }
 
@@ -1253,36 +1416,39 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     }
-    
+
     // Check main section selection
     if (_selectedIndex == 0) {
       return _buildDashboardContent();
     } else if (_selectedIndex > 0 && _selectedIndex < _sections.length) {
       return _buildOtherContent();
     }
-    
+
     // Default to dashboard
     return _buildDashboardContent();
   }
 
-  Widget _buildSubSectionContent(String subSectionTitle, [String? parentSection]) {
+  Widget _buildSubSectionContent(
+    String subSectionTitle, [
+    String? parentSection,
+  ]) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            _getSubSectionIcon(subSectionTitle), 
-            size: 64, 
-            color: const Color(0xFF17A2B8)
+            _getSubSectionIcon(subSectionTitle),
+            size: 64,
+            color: const Color(0xFF17A2B8),
           ),
           const SizedBox(height: 16),
           Text(
-            subSectionTitle, 
+            subSectionTitle,
             style: const TextStyle(
-              fontSize: 24, 
-              fontWeight: FontWeight.w600, 
-              color: Color(0xFF17A2B8)
-            )
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF17A2B8),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -1303,9 +1469,7 @@ class _HomeScreenState extends State<HomeScreen> {
               } else if (subSectionTitle == 'Flows') {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const FlowsScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const FlowsScreen()),
                 );
               } else if (subSectionTitle == 'Quick Replies') {
                 Navigator.push(
@@ -1355,7 +1519,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AnalyticsNotificationsScreen(),
+                      builder: (context) =>
+                          const AnalyticsNotificationsScreen(),
                     ),
                   );
                 } else {
@@ -1363,7 +1528,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const NotificationManagementScreen(),
+                      builder: (context) =>
+                          const NotificationManagementScreen(),
                     ),
                   );
                 }
@@ -1388,7 +1554,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AnalyticsMessageTemplatesScreen(),
+                    builder: (context) =>
+                        const AnalyticsMessageTemplatesScreen(),
                   ),
                 );
               } else if (subSectionTitle == 'Flow Responses') {
@@ -1429,9 +1596,7 @@ class _HomeScreenState extends State<HomeScreen> {
               } else if (subSectionTitle == 'Bots') {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const BotsScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const BotsScreen()),
                 );
               } else if (subSectionTitle == 'Drip Sequences') {
                 Navigator.push(
@@ -1553,422 +1718,430 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Welcome Onboard Section FIRST
-          const Text(
-            'Welcome Onboard! ??', 
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
-          ),
-          const SizedBox(height: 8),
-          const Text('New here? Get started by following the steps below.', style: TextStyle(fontSize: 16, color: Colors.grey)),
-          
-          const SizedBox(height: 32),
-
-          // Onboarding Steps - FIXED: Responsive layout
-          _buildResponsiveOnboardingSteps(),
-
-          // ADD SOCIAL MEDIA ICONS AFTER ALL ONBOARDING STEPS
-          const SizedBox(height: 32),
-          
           // Social Media Icons Row
           Container(
-  padding: const EdgeInsets.all(20),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(12),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.grey.withValues(alpha: 0.1),
-        blurRadius: 8,
-        offset: const Offset(0, 2),
-      ),
-    ],
-  ),
-  child: Column(
-    children: [
-      const Text(
-        'Connect with us',
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 8),
-      const Text(
-        'social media platforms',
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey,
-        ),
-        textAlign: TextAlign.center,
-      ),
-      const SizedBox(height: 20),
-
-      // FIRST ROW - WhatsApp, Facebook, Instagram
-Row(
-  children: [
-    // -------------------------
-    // 1. WhatsApp Button
-    // -------------------------
-    Expanded(
-      child: InkWell(
-        onTap: () {
-         Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const Whatsapp(),
-        ),
-      );
-         },
-        
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.green[50],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.green[100]!),
-          ),
-          child: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FaIcon(FontAwesomeIcons.whatsapp, color: Colors.green, size: 28),
-              SizedBox(height: 8),
-              Text(
-                'WhatsApp',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.green,
-                  fontWeight: FontWeight.w600,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-
-    const SizedBox(width: 12),
-
-    // -------------------------
-    // 2. Combined Meta Button (Facebook & Instagram)
-    // -------------------------
-    Expanded(
-      child: InkWell(
-        onTap: () {
-          // ONE ACTION: Opens the combined Meta/Social page
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const FbAndInstaScreen(),
+              ],
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F0FE), // Light Indigo/Blue background for Meta feel
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFD2E3FC)),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // FACEBOOK PART (Icon + Text)
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FaIcon(FontAwesomeIcons.facebook, color: Color(0xFF1877F2), size: 28),
-                  SizedBox(height: 8),
-                  Text(
-                    'Facebook',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF1877F2), // Facebook Blue Text
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Column(
+              children: [
+                const Text(
+                  'Connect with us',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
-                ],
-              ),
-
-              // Small vertical line to separate them visually (Optional)
-              SizedBox(
-                height: 30,
-                child: VerticalDivider(color: Colors.grey, thickness: 0.5),
-              ),
-
-              // INSTAGRAM PART (Icon + Text)
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FaIcon(FontAwesomeIcons.instagram, color: Color(0xFFE1306C), size: 28),
-                  SizedBox(height: 8),
-                  Text(
-                    'Instagram',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFFE1306C), // Instagram Pink Text
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  ],
-),
-      const SizedBox(height: 20),
-
-      // SECOND ROW - Homecontrol, Vault, Trust Me
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Homecontrol Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HomecontrolScreen(),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.teal[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.teal[100]!),
                 ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
+                const SizedBox(height: 8),
+                const Text(
+                  'social media platforms',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // FIRST ROW - WhatsApp, Facebook, Instagram
+                Row(
                   children: [
-                    FaIcon(
-                      FontAwesomeIcons.house,
-                      color: Colors.teal,
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Homecontrol',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.teal,
-                        fontWeight: FontWeight.w600,
+                    // -------------------------
+                    // 1. WhatsApp Button
+                    // -------------------------
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const Whatsapp(),
+                            ),
+                          );
+                        },
+
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green[100]!),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FaIcon(
+                                FontAwesomeIcons.whatsapp,
+                                color: Colors.green,
+                                size: 28,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'WhatsApp',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // -------------------------
+                    // 2. Combined Meta Button (Facebook & Instagram)
+                    // -------------------------
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          // ONE ACTION: Opens the combined Meta/Social page
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const FbAndInstaScreen(),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFE8F0FE,
+                            ), // Light Indigo/Blue background for Meta feel
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFD2E3FC)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // FACEBOOK PART (Icon + Text)
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  FaIcon(
+                                    FontAwesomeIcons.facebook,
+                                    color: Color(0xFF1877F2),
+                                    size: 28,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Facebook',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(
+                                        0xFF1877F2,
+                                      ), // Facebook Blue Text
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              // Small vertical line to separate them visually (Optional)
+                              SizedBox(
+                                height: 30,
+                                child: VerticalDivider(
+                                  color: Colors.grey,
+                                  thickness: 0.5,
+                                ),
+                              ),
+
+                              // INSTAGRAM PART (Icon + Text)
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  FaIcon(
+                                    FontAwesomeIcons.instagram,
+                                    color: Color(0xFFE1306C),
+                                    size: 28,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Instagram',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(
+                                        0xFFE1306C,
+                                      ), // Instagram Pink Text
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
+                const SizedBox(height: 20),
 
-          const SizedBox(width: 10),
-
-          // Vault Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const VaultScreen(),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blueGrey[100]!),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
+                // SECOND ROW - Homecontrol, Vault, Trust Me
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    FaIcon(
-                      FontAwesomeIcons.vault,
-                      color: Colors.blueGrey,
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Vault',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blueGrey,
-                        fontWeight: FontWeight.w600,
+                    // Homecontrol Icon
+                    Flexible(
+                      fit: FlexFit.tight,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HomecontrolScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.teal[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.teal[100]!),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FaIcon(
+                                FontAwesomeIcons.house,
+                                color: Colors.teal,
+                                size: 28,
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Homecontrol',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.teal,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
 
-          const SizedBox(width: 10),
+                    const SizedBox(width: 10),
+
+                    // Vault Icon
+                    Flexible(
+                      fit: FlexFit.tight,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const VaultScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blueGrey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blueGrey[100]!),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FaIcon(
+                                FontAwesomeIcons.vault,
+                                color: Colors.blueGrey,
+                                size: 28,
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Vault',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blueGrey,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
 
                     // Trust Me Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TrustMeHomeScreen(),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 229, 197, 234),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color.fromARGB(255, 213, 211, 213)),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FaIcon(
-                      FontAwesomeIcons.solidHandshake,
-                      color: Color.fromARGB(255, 115, 11, 134),
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Trust Me',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color.fromARGB(255, 136, 43, 153),
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      fit: FlexFit.tight,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TrustMeHomeScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(255, 229, 197, 234),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Color.fromARGB(255, 213, 211, 213),
+                            ),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FaIcon(
+                                FontAwesomeIcons.solidHandshake,
+                                color: Color.fromARGB(255, 115, 11, 134),
+                                size: 28,
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Trust Me',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color.fromARGB(255, 136, 43, 153),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
 
-      const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-    // THIRD ROW - Security, Guptik (with empty space for equal layout)
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Security Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SecurityScreen(),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color.fromARGB(201, 202, 215, 14)),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
+                // THIRD ROW - Security, Guptik (with empty space for equal layout)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    FaIcon(
-                      FontAwesomeIcons.shieldHalved,
-                      color: Color.fromARGB(201, 202, 215, 14),
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Security',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color.fromARGB(201, 202, 215, 14),
-                        fontWeight: FontWeight.w600,
+                    // Security Icon
+                    Flexible(
+                      fit: FlexFit.tight,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SecurityScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color.fromARGB(201, 202, 215, 14),
+                            ),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FaIcon(
+                                FontAwesomeIcons.shieldHalved,
+                                color: Color.fromARGB(201, 202, 215, 14),
+                                size: 28,
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Security',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color.fromARGB(201, 202, 215, 14),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    // Guptik Icon
+                    Flexible(
+                      fit: FlexFit.tight,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const GuptikScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(200, 248, 249, 245),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color.fromARGB(200, 9, 158, 76),
+                            ),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FaIcon(
+                                FontAwesomeIcons.personSnowboarding,
+                                color: Color.fromARGB(200, 9, 158, 76),
+                                size: 28,
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'GupTik',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color.fromARGB(200, 9, 158, 76),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
 
-          const SizedBox(width: 10),
-
-          // Guptik Icon
-          Flexible(
-            fit: FlexFit.tight,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const GuptikScreen(),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(200, 248, 249, 245),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color.fromARGB(200, 9, 158, 76)),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FaIcon(
-                      FontAwesomeIcons.personSnowboarding,
-                      color: Color.fromARGB(200, 9, 158, 76),
-                      size: 28,
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'GupTik',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color.fromARGB(200, 9, 158, 76),
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-           ],
-      ),
-            ],
-  ),
-),
-
-      const SizedBox(height: 40),
+          const SizedBox(height: 40),
 
           // Business Account Status (LIVE DATA)
           Container(
@@ -1976,11 +2149,17 @@ Row(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
                 ? _buildErrorDisplay()
                 : _buildStatusGrid(),
           ),
@@ -1989,7 +2168,7 @@ Row(
 
           // WhatsApp API Usage Header
           _buildUsageHeader(),
-          
+
           const SizedBox(height: 20),
 
           // API Usage Cards - FIXED: Simplified layout
@@ -2004,58 +2183,6 @@ Row(
     );
   }
 
-  Widget _buildResponsiveOnboardingSteps() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 600) {
-          return Column(
-            children: [
-              _buildOnboardingStep(1, 'Connect WhatsApp API', 'Configure API credentials.', Icons.key, true),
-              const SizedBox(height: 16),
-              _buildOnboardingStep(2, 'Verify Phone Number', 'Add and verify phone number.', Icons.phone, false),
-              const SizedBox(height: 16),
-              _buildOnboardingStep(3, 'Setup Business Profile', 'Complete business info.', Icons.business, false),
-              const SizedBox(height: 16),
-              _buildOnboardingStep(4, 'Create Message Template', 'Design your first template.', Icons.message, true),
-            ],
-          );
-        } else if (constraints.maxWidth < 800) {
-          return Column(
-            children: [
-              ResponsiveRow(
-                children: [
-                  Expanded(child: _buildOnboardingStep(1, 'Connect WhatsApp API', 'Configure API credentials.', Icons.key, true)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildOnboardingStep(2, 'Verify Phone Number', 'Add and verify phone number.', Icons.phone, false)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ResponsiveRow(
-                children: [
-                  Expanded(child: _buildOnboardingStep(3, 'Setup Business Profile', 'Complete business info.', Icons.business, false)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildOnboardingStep(4, 'Create Message Template', 'Design your first template.', Icons.message, true)),
-                ],
-              ),
-            ],
-          );
-        } else {
-          return ResponsiveRow(
-            children: [
-              Expanded(child: _buildOnboardingStep(1, 'Connect WhatsApp API', 'Configure your WhatsApp Business API credentials and account settings.', Icons.key, true)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildOnboardingStep(2, 'Verify Phone Number', 'Add and verify your business phone number for message delivery.', Icons.phone, false)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildOnboardingStep(3, 'Setup Business Profile', 'Complete your business information and professional profile.', Icons.business, false)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildOnboardingStep(4, 'Create Message Template', 'Design and submit your first message template for approval.', Icons.message, true)),
-            ],
-          );
-        }
-      },
-    );
-  }
-
   Widget _buildStatusGrid() {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2064,17 +2191,37 @@ Row(
             children: [
               ResponsiveRow(
                 children: [
-                  Expanded(child: _buildStatusItem('Phone Number', _dashboardData?.phoneNumberStatus?.displayPhoneNumber ?? 'Loading...')),
+                  Expanded(
+                    child: _buildStatusItem(
+                      'Phone Number',
+                      _dashboardData?.phoneNumberStatus?.displayPhoneNumber ??
+                          'Loading...',
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildStatusItem('Display Name', _dashboardData?.businessProfile?.displayName ?? 'Loading...')),
+                  Expanded(
+                    child: _buildStatusItem(
+                      'Display Name',
+                      _dashboardData?.businessProfile?.displayName ??
+                          'Loading...',
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               ResponsiveRow(
                 children: [
-                  Expanded(child: _buildStatusItem('Messaging Limit', '1k/24hr')),
+                  Expanded(
+                    child: _buildStatusItem('Messaging Limit', '1k/24hr'),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildStatusItem('Quality Rating', _dashboardData?.qualityRating?.rating ?? 'Loading...', isGreen: true)),
+                  Expanded(
+                    child: _buildStatusItem(
+                      'Quality Rating',
+                      _dashboardData?.qualityRating?.rating ?? 'Loading...',
+                      isGreen: true,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2082,7 +2229,13 @@ Row(
                 children: [
                   Expanded(child: _buildStatusItem('MM Lite API', '')),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildStatusItem('Phone Status', _getConnectionStatus(), isGreen: _getConnectionStatus() == 'CONNECTED')),
+                  Expanded(
+                    child: _buildStatusItem(
+                      'Phone Status',
+                      _getConnectionStatus(),
+                      isGreen: _getConnectionStatus() == 'CONNECTED',
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -2090,17 +2243,40 @@ Row(
         } else {
           return ResponsiveRow(
             children: [
-              Expanded(child: _buildStatusItem('Phone Number', _dashboardData?.phoneNumberStatus?.displayPhoneNumber ?? 'Loading...')),
+              Expanded(
+                child: _buildStatusItem(
+                  'Phone Number',
+                  _dashboardData?.phoneNumberStatus?.displayPhoneNumber ??
+                      'Loading...',
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatusItem('Display Name', _dashboardData?.businessProfile?.displayName ?? 'Loading...')),
+              Expanded(
+                child: _buildStatusItem(
+                  'Display Name',
+                  _dashboardData?.businessProfile?.displayName ?? 'Loading...',
+                ),
+              ),
               const SizedBox(width: 16),
               Expanded(child: _buildStatusItem('Messaging Limit', '1k/24hr')),
               const SizedBox(width: 16),
               Expanded(child: _buildStatusItem('MM Lite API', '')),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatusItem('Quality Rating', _dashboardData?.qualityRating?.rating ?? 'Loading...', isGreen: true)),
+              Expanded(
+                child: _buildStatusItem(
+                  'Quality Rating',
+                  _dashboardData?.qualityRating?.rating ?? 'Loading...',
+                  isGreen: true,
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatusItem('Phone Status', _getConnectionStatus(), isGreen: _getConnectionStatus() == 'CONNECTED')),
+              Expanded(
+                child: _buildStatusItem(
+                  'Phone Status',
+                  _getConnectionStatus(),
+                  isGreen: _getConnectionStatus() == 'CONNECTED',
+                ),
+              ),
             ],
           );
         }
@@ -2182,14 +2358,9 @@ Row(
         } else {
           return ResponsiveRow(
             children: [
-              Expanded(
-                flex: 2,
-                child: _buildMessageDeliveryCard(),
-              ),
+              Expanded(flex: 2, child: _buildMessageDeliveryCard()),
               const SizedBox(width: 16),
-              Expanded(
-                child: _buildMessagesSummaryCard(),
-              ),
+              Expanded(child: _buildMessagesSummaryCard()),
             ],
           );
         }
@@ -2203,7 +2374,13 @@ Row(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2231,25 +2408,77 @@ Row(
               if (constraints.maxWidth < 400) {
                 return Column(
                   children: [
-                    _buildStatColumn(_dashboardData?.messageAnalytics?.marketing.toString() ?? '0', 'Marketing'),
+                    _buildStatColumn(
+                      _dashboardData?.messageAnalytics?.marketing.toString() ??
+                          '0',
+                      'Marketing',
+                    ),
                     const SizedBox(height: 16),
-                    _buildStatColumn(_dashboardData?.messageAnalytics?.authentication.toString() ?? '0', 'Auth'),
+                    _buildStatColumn(
+                      _dashboardData?.messageAnalytics?.authentication
+                              .toString() ??
+                          '0',
+                      'Auth',
+                    ),
                     const SizedBox(height: 16),
-                    _buildStatColumn(_dashboardData?.messageAnalytics?.service.toString() ?? '0', 'Service'),
+                    _buildStatColumn(
+                      _dashboardData?.messageAnalytics?.service.toString() ??
+                          '0',
+                      'Service',
+                    ),
                     const SizedBox(height: 16),
-                    _buildStatColumn(_dashboardData?.messageAnalytics?.utility.toString() ?? '0', 'Utility'),
+                    _buildStatColumn(
+                      _dashboardData?.messageAnalytics?.utility.toString() ??
+                          '0',
+                      'Utility',
+                    ),
                     const SizedBox(height: 16),
-                    _buildStatColumn(_dashboardData?.messageAnalytics?.total.toString() ?? '0', 'Total'),
+                    _buildStatColumn(
+                      _dashboardData?.messageAnalytics?.total.toString() ?? '0',
+                      'Total',
+                    ),
                   ],
                 );
               } else {
                 return ResponsiveRow(
                   children: [
-                    Expanded(child: _buildStatColumn(_dashboardData?.messageAnalytics?.marketing.toString() ?? '0', 'Marketing')),
-                    Expanded(child: _buildStatColumn(_dashboardData?.messageAnalytics?.authentication.toString() ?? '0', 'Auth')),
-                    Expanded(child: _buildStatColumn(_dashboardData?.messageAnalytics?.service.toString() ?? '0', 'Service')),
-                    Expanded(child: _buildStatColumn(_dashboardData?.messageAnalytics?.utility.toString() ?? '0', 'Utility')),
-                    Expanded(child: _buildStatColumn(_dashboardData?.messageAnalytics?.total.toString() ?? '0', 'Total')),
+                    Expanded(
+                      child: _buildStatColumn(
+                        _dashboardData?.messageAnalytics?.marketing
+                                .toString() ??
+                            '0',
+                        'Marketing',
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildStatColumn(
+                        _dashboardData?.messageAnalytics?.authentication
+                                .toString() ??
+                            '0',
+                        'Auth',
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildStatColumn(
+                        _dashboardData?.messageAnalytics?.service.toString() ??
+                            '0',
+                        'Service',
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildStatColumn(
+                        _dashboardData?.messageAnalytics?.utility.toString() ??
+                            '0',
+                        'Utility',
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildStatColumn(
+                        _dashboardData?.messageAnalytics?.total.toString() ??
+                            '0',
+                        'Total',
+                      ),
+                    ),
                   ],
                 );
               }
@@ -2266,7 +2495,13 @@ Row(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2291,9 +2526,19 @@ Row(
           const SizedBox(height: 20),
           ResponsiveRow(
             children: [
-              Expanded(child: _buildStatColumn(_dashboardData?.messageAnalytics?.sent.toString() ?? '0', 'Sent')),
+              Expanded(
+                child: _buildStatColumn(
+                  _dashboardData?.messageAnalytics?.sent.toString() ?? '0',
+                  'Sent',
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatColumn(_dashboardData?.messageAnalytics?.delivered.toString() ?? '0', 'Delivered')),
+              Expanded(
+                child: _buildStatColumn(
+                  _dashboardData?.messageAnalytics?.delivered.toString() ?? '0',
+                  'Delivered',
+                ),
+              ),
             ],
           ),
         ],
@@ -2335,7 +2580,13 @@ Row(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2375,7 +2626,13 @@ Row(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2403,7 +2660,10 @@ Row(
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -2418,7 +2678,10 @@ Row(
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
-                  child: Text('Contacts', style: TextStyle(color: Colors.black54)),
+                  child: Text(
+                    'Contacts',
+                    style: TextStyle(color: Colors.black54),
+                  ),
                 ),
               ],
             ),
@@ -2434,7 +2697,13 @@ Row(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2458,7 +2727,11 @@ Row(
           ),
           const SizedBox(height: 16),
           _buildQuickLink(Icons.chat, 'Follow us on WhatsApp', Colors.green),
-          _buildQuickLink(Icons.facebook, 'Join our Facebook group', Colors.blue),
+          _buildQuickLink(
+            Icons.facebook,
+            'Join our Facebook group',
+            Colors.blue,
+          ),
           _buildQuickLink(Icons.star, 'Review us on TrustPilot', Colors.orange),
         ],
       ),
@@ -2472,11 +2745,7 @@ Row(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Colors.red[400],
-            ),
+            Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
             const SizedBox(height: 16),
             Text(
               _error!,
@@ -2495,7 +2764,10 @@ Row(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF17A2B8),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -2546,10 +2818,7 @@ Row(
             flex: 2,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -2601,13 +2870,25 @@ Row(
     );
   }
 
-  Widget _buildOnboardingStep(int step, String title, String description, IconData icon, bool isCompleted) {
+  Widget _buildOnboardingStep(
+    int step,
+    String title,
+    String description,
+    IconData icon,
+    bool isCompleted,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2621,42 +2902,43 @@ Row(
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  isCompleted ? Icons.check : icon, 
-                  color: isCompleted ? Colors.white : Colors.grey[600], 
-                  size: 24
+                  isCompleted ? Icons.check : icon,
+                  color: isCompleted ? Colors.white : Colors.grey[600],
+                  size: 24,
                 ),
               ),
               const Spacer(),
-              if (isCompleted) const Icon(Icons.check_circle, color: Colors.green, size: 20),
+              if (isCompleted)
+                const Icon(Icons.check_circle, color: Colors.green, size: 20),
             ],
           ),
-            const SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
-            'STEP $step', 
+            'STEP $step',
             style: const TextStyle(
-              fontSize: 12, 
-              fontWeight: FontWeight.bold, 
-              color: Colors.grey, 
-              letterSpacing: 1
-            )
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+              letterSpacing: 1,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
-            title, 
+            title,
             style: const TextStyle(
-              fontSize: 16, 
-              fontWeight: FontWeight.bold, 
-              color: Colors.black87
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           Text(
-            description, 
+            description,
             style: const TextStyle(
-              fontSize: 14, 
-              color: Colors.grey, 
-              height: 1.4
+              fontSize: 14,
+              color: Colors.grey,
+              height: 1.4,
             ),
             overflow: TextOverflow.ellipsis,
             maxLines: 2,
@@ -2665,12 +2947,12 @@ Row(
           TextButton(
             onPressed: () {},
             child: const Text(
-              'Learn more.', 
+              'Learn more.',
               style: TextStyle(
-                color: Color(0xFF17A2B8), 
+                color: Color(0xFF17A2B8),
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-              )
+              ),
             ),
           ),
         ],
@@ -2682,13 +2964,37 @@ Row(
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         const SizedBox(height: 4),
         Row(
           children: [
-            if (isGreen && value.isNotEmpty) Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+            if (isGreen && value.isNotEmpty)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                ),
+              ),
             if (isGreen && value.isNotEmpty) const SizedBox(width: 6),
-            Expanded(child: Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isGreen ? Colors.green : Colors.black87))),
+            Expanded(
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isGreen ? Colors.green : Colors.black87,
+                ),
+              ),
+            ),
           ],
         ),
       ],
@@ -2697,20 +3003,36 @@ Row(
 
   Widget _buildOtherContent() {
     // Check if Inbox is selected
-    if (_selectedIndex >= 0 && _selectedIndex < _sections.length && _sections[_selectedIndex].title == 'Inbox') {
+    if (_selectedIndex >= 0 &&
+        _selectedIndex < _sections.length &&
+        _sections[_selectedIndex].title == 'Inbox') {
       return _buildInboxContent();
     }
-    
+
     // Default content for other sections
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(_sections[_selectedIndex].icon, size: 64, color: Colors.grey[400]),
+          Icon(
+            _sections[_selectedIndex].icon,
+            size: 64,
+            color: Colors.grey[400],
+          ),
           const SizedBox(height: 16),
-          Text(_sections[_selectedIndex].title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey)),
+          Text(
+            _sections[_selectedIndex].title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey,
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('Content coming soon...', style: TextStyle(fontSize: 16, color: Colors.grey)),
+          const Text(
+            'Content coming soon...',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -2733,9 +3055,9 @@ class DashboardSection {
   bool isExpanded;
 
   DashboardSection({
-    required this.icon, 
-    required this.title, 
-    this.badge, 
+    required this.icon,
+    required this.title,
+    this.badge,
     this.isSelected = false,
     this.subSections,
     this.isExpanded = false,
@@ -2747,21 +3069,14 @@ class SubSection {
   final IconData? icon;
   bool isSelected;
 
-  SubSection({
-    required this.title,
-    this.icon,
-    this.isSelected = false,
-  });
+  SubSection({required this.title, this.icon, this.isSelected = false});
 }
 
 // Inbox Content Widget - Shows inbox interface within main dashboard area
 class InboxContentWidget extends StatefulWidget {
   final ConversationsService conversationsService;
 
-  const InboxContentWidget({
-    super.key,
-    required this.conversationsService,
-  });
+  const InboxContentWidget({super.key, required this.conversationsService});
 
   @override
   State<InboxContentWidget> createState() => _InboxContentWidgetState();
@@ -2770,14 +3085,14 @@ class InboxContentWidget extends StatefulWidget {
 class _InboxContentWidgetState extends State<InboxContentWidget> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
-  
+
   List<Conversation> conversations = [];
   List<Message> selectedConversationMessages = [];
   Conversation? selectedConversation;
   bool isLoading = true;
   String selectedFilter = 'All';
   String searchQuery = '';
-  
+
   final List<String> filters = ['All', 'Active', 'Closed'];
 
   @override
@@ -2788,13 +3103,17 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
 
   Future<void> _loadConversations() async {
     setState(() => isLoading = true);
-    
+
     try {
-      String? filterParam = selectedFilter == 'All' ? null : selectedFilter.toLowerCase();
+      String? filterParam = selectedFilter == 'All'
+          ? null
+          : selectedFilter.toLowerCase();
       final loadedConversations = searchQuery.isEmpty
-          ? await widget.conversationsService.getConversations(filter: filterParam)
+          ? await widget.conversationsService.getConversations(
+              filter: filterParam,
+            )
           : await widget.conversationsService.searchConversations(searchQuery);
-      
+
       setState(() {
         conversations = loadedConversations;
         isLoading = false;
@@ -2816,11 +3135,12 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
     });
 
     try {
-      final messages = await widget.conversationsService.getConversationMessages(conversation.id);
+      final messages = await widget.conversationsService
+          .getConversationMessages(conversation.id);
       setState(() {
         selectedConversationMessages = messages;
       });
-      
+
       // Mark as read
       if (conversation.isUnread) {
         await widget.conversationsService.markAsRead(conversation.id);
@@ -2828,15 +3148,16 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading messages: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading messages: $e')));
       }
     }
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty || selectedConversation == null) return;
+    if (_messageController.text.trim().isEmpty || selectedConversation == null)
+      return;
 
     final messageText = _messageController.text.trim();
     _messageController.clear();
@@ -2865,7 +3186,9 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
     if (success) {
       // Update message status to delivered
       setState(() {
-        final index = selectedConversationMessages.indexWhere((m) => m.id == newMessage.id);
+        final index = selectedConversationMessages.indexWhere(
+          (m) => m.id == newMessage.id,
+        );
         if (index != -1) {
           selectedConversationMessages[index] = Message(
             id: newMessage.id,
@@ -2881,7 +3204,9 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
     } else {
       // Update message status to failed
       setState(() {
-        final index = selectedConversationMessages.indexWhere((m) => m.id == newMessage.id);
+        final index = selectedConversationMessages.indexWhere(
+          (m) => m.id == newMessage.id,
+        );
         if (index != -1) {
           selectedConversationMessages[index] = Message(
             id: newMessage.id,
@@ -2917,7 +3242,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                     child: _buildConversationList(),
                   ),
                 ),
-              
+
               // Conversation view (slides in)
               if (selectedConversation != null)
                 Positioned.fill(
@@ -2932,7 +3257,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
             ],
           );
         }
-        
+
         // Desktop layout (original side-by-side)
         return Container(
           padding: const EdgeInsets.all(12),
@@ -2950,9 +3275,9 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                   child: _buildConversationList(),
                 ),
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // Main conversation area
               Expanded(
                 flex: 2,
@@ -3001,7 +3326,11 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.comment_outlined, color: Colors.grey, size: 18),
+                icon: const Icon(
+                  Icons.comment_outlined,
+                  color: Colors.grey,
+                  size: 18,
+                ),
                 onPressed: () {
                   // Handle new conversation
                 },
@@ -3035,13 +3364,11 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
             ],
           ),
         ),
-        
+
         // Header with search and filters
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.grey[50],
-          ),
+          decoration: BoxDecoration(color: Colors.grey[50]),
           child: Column(
             children: [
               // Search bar
@@ -3057,7 +3384,10 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                     hintText: 'Search contacts and messages',
                     prefixIcon: Icon(Icons.search, color: Colors.grey),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                   onChanged: (value) {
                     setState(() => searchQuery = value);
@@ -3065,59 +3395,70 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                   },
                 ),
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               // Filter tabs
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
-                children: filters.map((filter) => GestureDetector(
-                  onTap: () {
-                    setState(() => selectedFilter = filter);
-                    _loadConversations();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: selectedFilter == filter 
-                          ? const Color(0xFF17A2B8) 
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: selectedFilter == filter 
-                            ? const Color(0xFF17A2B8) 
-                            : Colors.grey[300]!,
+                children: filters
+                    .map(
+                      (filter) => GestureDetector(
+                        onTap: () {
+                          setState(() => selectedFilter = filter);
+                          _loadConversations();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selectedFilter == filter
+                                ? const Color(0xFF17A2B8)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: selectedFilter == filter
+                                  ? const Color(0xFF17A2B8)
+                                  : Colors.grey[300]!,
+                            ),
+                          ),
+                          child: Text(
+                            filter,
+                            style: TextStyle(
+                              color: selectedFilter == filter
+                                  ? Colors.white
+                                  : Colors.grey[700],
+                              fontWeight: selectedFilter == filter
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      filter,
-                      style: TextStyle(
-                        color: selectedFilter == filter ? Colors.white : Colors.grey[700],
-                        fontWeight: selectedFilter == filter ? FontWeight.w600 : FontWeight.normal,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                )).toList(),
+                    )
+                    .toList(),
               ),
             ],
           ),
         ),
-        
+
         // Conversations list
         Expanded(
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
               : conversations.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      itemCount: conversations.length,
-                      itemBuilder: (context, index) {
-                        final conversation = conversations[index];
-                        return _buildConversationTile(conversation);
-                      },
-                    ),
+              ? _buildEmptyState()
+              : ListView.builder(
+                  itemCount: conversations.length,
+                  itemBuilder: (context, index) {
+                    final conversation = conversations[index];
+                    return _buildConversationTile(conversation);
+                  },
+                ),
         ),
       ],
     );
@@ -3125,27 +3466,34 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
 
   Widget _buildConversationTile(Conversation conversation) {
     final isSelected = selectedConversation?.id == conversation.id;
-    
+
     return Container(
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF17A2B8).withValues(alpha: 0.1) : Colors.white,
+        color: isSelected
+            ? const Color(0xFF17A2B8).withValues(alpha: 0.1)
+            : Colors.white,
         border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
       ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: const Color(0xFF17A2B8),
           child: Text(
-            _getInitials(conversation.contactName??''),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            _getInitials(conversation.contactName ?? ''),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         title: Row(
           children: [
             Expanded(
               child: Text(
-                conversation.contactName??'',
+                conversation.contactName ?? '',
                 style: TextStyle(
-                  fontWeight: conversation.isUnread ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: conversation.isUnread
+                      ? FontWeight.bold
+                      : FontWeight.normal,
                   fontSize: 13,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -3156,7 +3504,9 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
               style: TextStyle(
                 fontSize: 10,
                 color: Colors.grey[600],
-                fontWeight: conversation.isUnread ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: conversation.isUnread
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
           ],
@@ -3165,11 +3515,15 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
           children: [
             Expanded(
               child: Text(
-                conversation.lastMessage??'',
+                conversation.lastMessage ?? '',
                 style: TextStyle(
                   fontSize: 11,
-                  color: conversation.isUnread ? Colors.black87 : Colors.grey[600],
-                  fontWeight: conversation.isUnread ? FontWeight.w500 : FontWeight.normal,
+                  color: conversation.isUnread
+                      ? Colors.black87
+                      : Colors.grey[600],
+                  fontWeight: conversation.isUnread
+                      ? FontWeight.w500
+                      : FontWeight.normal,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -3200,18 +3554,11 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 48,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[400]),
           const SizedBox(height: 12),
           Text(
             'All conversations loaded.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
         ],
       ),
@@ -3223,18 +3570,11 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.chat_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.chat_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 12),
           Text(
             'Select a contact to view conversation.',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
         ],
       ),
@@ -3260,8 +3600,11 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
               CircleAvatar(
                 backgroundColor: const Color(0xFF17A2B8),
                 child: Text(
-                  _getInitials(selectedConversation!.contactName??''),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  _getInitials(selectedConversation!.contactName ?? ''),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -3270,7 +3613,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      selectedConversation!.contactName??'',
+                      selectedConversation!.contactName ?? '',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -3279,10 +3622,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                     ),
                     Text(
                       selectedConversation!.phoneNumber,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -3297,7 +3637,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
             ],
           ),
         ),
-        
+
         // Messages list
         Expanded(
           child: selectedConversationMessages.isEmpty
@@ -3311,7 +3651,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                   },
                 ),
         ),
-        
+
         // Message input
         Container(
           padding: const EdgeInsets.all(12),
@@ -3336,7 +3676,10 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
                     maxLines: null,
                     onSubmitted: (_) => _sendMessage(),
@@ -3352,11 +3695,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
                     color: Color(0xFF17A2B8),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.send,
-                    color: Colors.white,
-                    size: 18,
-                  ),
+                  child: const Icon(Icons.send, color: Colors.white, size: 18),
                 ),
               ),
             ],
@@ -3368,7 +3707,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
 
   Widget _buildMessageBubble(Message message) {
     final isFromBusiness = message.isFromBusiness;
-    
+
     return Align(
       alignment: isFromBusiness ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -3434,7 +3773,7 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    
+
     if (difference.inMinutes < 60) {
       return '${difference.inMinutes}m';
     } else if (difference.inHours < 24) {
