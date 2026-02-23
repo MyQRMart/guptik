@@ -122,7 +122,7 @@ class DynamicBackgroundWidget extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.yellow.withOpacity(0.3),
+                    color: Colors.yellow.withValues(alpha: 0.3),
                     blurRadius: 20,
                     spreadRadius: 10,
                   ),

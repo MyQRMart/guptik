@@ -385,14 +385,16 @@ class StarPainter extends CustomPainter {
       // High visibility glow for tiny stars
       final outerGlowPaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = Colors.white.withOpacity(currentGlow * 0.6); // Much brighter
+        ..color = Colors.white.withValues(
+          alpha: currentGlow * 0.6,
+        ); // Much brighter
 
       canvas.drawPath(starPath, outerGlowPaint);
 
       // Bright core for visibility
       final corePaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = Colors.white.withOpacity(currentBrightness)
+        ..color = Colors.white.withValues(alpha: currentBrightness)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, 0.2);
 
       canvas.drawCircle(Offset(x, y), spikeSize * 0.4, corePaint);
@@ -525,8 +527,10 @@ class FallingStarPainter extends CustomPainter {
 
         // Premium white luminous color with slight blue tint
         final color = Color.lerp(
-          Colors.white.withOpacity(opacity.clamp(0.0, 1.0)),
-          const Color(0xFFE6F3FF).withOpacity((opacity * 0.8).clamp(0.0, 1.0)),
+          Colors.white.withValues(alpha: opacity.clamp(0.0, 1.0)),
+          const Color(
+            0xFFE6F3FF,
+          ).withValues(alpha: (opacity * 0.8).clamp(0.0, 1.0)),
           segmentRatio * 0.3,
         )!;
 

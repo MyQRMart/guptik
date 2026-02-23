@@ -51,7 +51,7 @@ class GlassSwitchControlTile extends StatelessWidget {
 
   List<Color> _getGradientColors() {
     final baseColor = _getTypeColor();
-    return [baseColor.withOpacity(0.8), baseColor.withOpacity(0.6)];
+    return [baseColor.withValues(alpha: 0.8), baseColor.withValues(alpha: 0.6)];
   }
 
   Future<void> _showNameEditDialog(BuildContext context) async {
@@ -61,7 +61,7 @@ class GlassSwitchControlTile extends StatelessWidget {
 
     return showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.3),
       builder: (context) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Dialog(
@@ -84,25 +84,29 @@ class GlassSwitchControlTile extends StatelessWidget {
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'Switch Name',
-                    labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
+                    labelStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
                     hintText: 'Enter new name',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha: 0.3),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha: 0.3),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -153,13 +157,13 @@ class GlassSwitchControlTile extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       customShadows: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 15,
           offset: const Offset(0, 8),
         ),
         if (device.state)
           BoxShadow(
-            color: _getTypeColor().withOpacity(0.3),
+            color: _getTypeColor().withValues(alpha: 0.3),
             blurRadius: 20,
             spreadRadius: 2,
           ),
@@ -185,8 +189,8 @@ class GlassSwitchControlTile extends StatelessWidget {
                     colors: device.state
                         ? _getGradientColors()
                         : [
-                            Colors.grey.withOpacity(0.3),
-                            Colors.grey.withOpacity(0.1),
+                            Colors.grey.withValues(alpha: 0.3),
+                            Colors.grey.withValues(alpha: 0.1),
                           ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -194,7 +198,7 @@ class GlassSwitchControlTile extends StatelessWidget {
                   boxShadow: [
                     if (device.state)
                       BoxShadow(
-                        color: _getTypeColor().withOpacity(0.4),
+                        color: _getTypeColor().withValues(alpha: 0.4),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),
@@ -213,7 +217,7 @@ class GlassSwitchControlTile extends StatelessWidget {
                 padding: const EdgeInsets.all(6),
                 child: Icon(
                   Icons.more_vert,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   size: 18,
                 ),
                 onPressed: () => _showTypeSelector(context),
@@ -243,7 +247,7 @@ class GlassSwitchControlTile extends StatelessWidget {
               Text(
                 device.type.name.toUpperCase(),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   letterSpacing: 1.0,
                   fontSize: 10,
                 ),
@@ -262,13 +266,13 @@ class GlassSwitchControlTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: device.state
-                      ? _getTypeColor().withOpacity(0.2)
-                      : Colors.grey.withOpacity(0.2),
+                      ? _getTypeColor().withValues(alpha: 0.2)
+                      : Colors.grey.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: device.state
-                        ? _getTypeColor().withOpacity(0.4)
-                        : Colors.grey.withOpacity(0.4),
+                        ? _getTypeColor().withValues(alpha: 0.4)
+                        : Colors.grey.withValues(alpha: 0.4),
                   ),
                 ),
                 child: Text(
@@ -302,7 +306,7 @@ class GlassSwitchControlTile extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.3),
       isScrollControlled: true,
       builder: (context) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -321,7 +325,7 @@ class GlassSwitchControlTile extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
