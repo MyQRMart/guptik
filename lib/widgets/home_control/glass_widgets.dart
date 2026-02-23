@@ -33,8 +33,8 @@ class GlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final glassColor = theme.brightness == Brightness.dark
-        ? Colors.white.withOpacity(0.1)
-        : Colors.white.withOpacity(0.2);
+        ? Colors.white.withValues(alpha: 0.1)
+        : Colors.white.withValues(alpha: 0.2);
 
     return Container(
       width: width,
@@ -52,22 +52,22 @@ class GlassCard extends StatelessWidget {
               gradient: LinearGradient(
                 colors: [
                   backgroundColor ?? glassColor,
-                  backgroundColor?.withOpacity(0.05) ??
-                      glassColor.withOpacity(0.05),
+                  backgroundColor?.withValues(alpha: 0.05) ??
+                      glassColor.withValues(alpha: 0.05),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(borderRadius),
               border: Border.all(
-                color: borderColor ?? glassColor.withOpacity(0.3),
+                color: borderColor ?? glassColor.withValues(alpha: 0.3),
                 width: 1,
               ),
               boxShadow:
                   customShadows ??
                   [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -166,27 +166,27 @@ class _GlassButtonState extends State<GlassButton>
                   colors:
                       widget.gradientColors ??
                       [
-                        Colors.white.withOpacity(0.3),
-                        Colors.white.withOpacity(0.1),
+                        Colors.white.withValues(alpha: 0.3),
+                        Colors.white.withValues(alpha: 0.1),
                       ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
                 borderRadius: BorderRadius.circular(widget.borderRadius),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.4),
+                  color: Colors.white.withValues(alpha: 0.4),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                   if (widget.isActive)
                     BoxShadow(
                       color: (widget.gradientColors?.first ?? Colors.blue)
-                          .withOpacity(0.3),
+                          .withValues(alpha: 0.3),
                       blurRadius: 15,
                       spreadRadius: 2,
                     ),
@@ -300,14 +300,14 @@ class _GlassToggleSwitchState extends State<GlassToggleSwitch>
               borderRadius: BorderRadius.circular(widget.height / 2),
               boxShadow: [
                 BoxShadow(
-                  color: (_colorAnimation.value ?? Colors.grey).withOpacity(
-                    0.4,
+                  color: (_colorAnimation.value ?? Colors.grey).withValues(
+                    alpha: 0.4,
                   ),
                   blurRadius: widget.value ? 15 : 8,
                   spreadRadius: widget.value ? 2 : 0,
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 5,
                   offset: const Offset(0, 2),
                 ),
@@ -323,7 +323,7 @@ class _GlassToggleSwitchState extends State<GlassToggleSwitch>
                       filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(
                             widget.height / 2,
                           ),
@@ -352,7 +352,7 @@ class _GlassToggleSwitchState extends State<GlassToggleSwitch>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -388,7 +388,7 @@ class GradientBackground extends StatelessWidget {
         colors ??
         [
           Theme.of(context).scaffoldBackgroundColor,
-          Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
+          Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
         ];
 
     return Container(

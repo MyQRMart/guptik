@@ -134,7 +134,7 @@ class _CreateTemplateScreenState extends State<CreateTemplateScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Trust me Template'),
-        backgroundColor: const Color(0xFF25D366),
+        backgroundColor: Colors.green,
         foregroundColor: Colors.white,
       ),
       body: ListView(
@@ -306,7 +306,7 @@ class _CreateTemplateScreenState extends State<CreateTemplateScreen> {
               ? const Center(child: CircularProgressIndicator())
               : ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366),
+                    backgroundColor: Colors.green,
                     padding: const EdgeInsets.all(16),
                   ),
                   onPressed: _submitTemplate,

@@ -210,11 +210,11 @@ class SnowPainter extends CustomPainter {
     canvas.rotate(snowflake.rotation);
 
     final paint = Paint()
-      ..color = Colors.white.withOpacity(snowflake.opacity)
+      ..color = Colors.white.withValues(alpha: snowflake.opacity)
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = Colors.white.withOpacity(snowflake.opacity * 0.8)
+      ..color = Colors.white.withValues(alpha: snowflake.opacity * 0.8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 

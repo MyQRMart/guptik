@@ -225,7 +225,7 @@ class _AnimatedSkyBackgroundState extends State<AnimatedSkyBackground>
         phase: 0.0,
       ),
     );
-    print(
+    debugPrint(
       'Generated new falling star: startX=$randomStartX, endX=$randomEndX',
     ); // Debug
   }
@@ -414,7 +414,7 @@ class CloudBackgroundPainter extends CustomPainter {
     for (final cloud in clouds) {
       final paint = Paint()
         ..style = PaintingStyle.fill
-        ..color = Colors.white.withOpacity(cloud.opacity);
+        ..color = Colors.white.withValues(alpha: cloud.opacity);
 
       // Calculate cloud position with wrapping
       final x = (cloud.x + animationValue * cloud.speed) % 1.3 - 0.3;
@@ -545,7 +545,9 @@ class FallingStarPainter extends CustomPainter {
             ..strokeWidth = safeGlowWidth
             ..style = PaintingStyle.stroke
             ..strokeCap = StrokeCap.round
-            ..color = Colors.white.withOpacity((opacity * 0.2).clamp(0.0, 1.0));
+            ..color = Colors.white.withValues(
+              alpha: (opacity * 0.2).clamp(0.0, 1.0),
+            );
 
           if (i < tailPoints.length - 1) {
             canvas.drawLine(tailPoints[i], tailPoints[i + 1], glowPaint);
@@ -565,21 +567,23 @@ class FallingStarPainter extends CustomPainter {
       // Draw luminous glow layers for the star head
       final outerGlowPaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = const Color(0xFFE6F3FF).withOpacity(currentGlow * 0.3);
+        ..color = const Color(0xFFE6F3FF).withValues(alpha: currentGlow * 0.3);
 
       canvas.drawCircle(Offset(x, y), starSize * 2.0, outerGlowPaint);
 
       // Inner glow
       final innerGlowPaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = Colors.white.withOpacity(currentGlow * 0.5);
+        ..color = Colors.white.withValues(alpha: currentGlow * 0.5);
 
       canvas.drawCircle(Offset(x, y), starSize * 1.3, innerGlowPaint);
 
       // Main star head (simple circle)
       final starPaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = Colors.white.withOpacity(currentBrightness.clamp(0.0, 1.0));
+        ..color = Colors.white.withValues(
+          alpha: currentBrightness.clamp(0.0, 1.0),
+        );
 
       canvas.drawCircle(Offset(x, y), starSize, starPaint);
     }
@@ -631,14 +635,14 @@ class BirdPainter extends CustomPainter {
 
       // Draw bird body (small oval)
       final bodyPaint = Paint()
-        ..color = Colors.black87.withOpacity(0.7)
+        ..color = Colors.black87.withValues(alpha: 0.7)
         ..style = PaintingStyle.fill;
 
       canvas.drawOval(const Rect.fromLTWH(-3, -1, 6, 2), bodyPaint);
 
       // Draw wings (V-shape that flaps)
       final wingPaint = Paint()
-        ..color = Colors.black87.withOpacity(0.6)
+        ..color = Colors.black87.withValues(alpha: 0.6)
         ..strokeWidth = 1.0
         ..style = PaintingStyle.stroke;
 

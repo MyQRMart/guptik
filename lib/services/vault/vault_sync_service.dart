@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,7 +13,7 @@ class VaultSyncService {
 
       // FIX 1: Ensure userId is not null before using it
       if (userId == null) {
-        print("User not logged in");
+        debugPrint("User not logged in");
         return null;
       }
 
@@ -21,21 +22,25 @@ class VaultSyncService {
           .from('desktop_devices')
           .select('public_url')
           .eq('user_id', userId) // Now safe because we checked for null above
-          .not('public_url', 'is', null) // FIX 2: Correct way to filter "IS NOT NULL"
+          .not(
+            'public_url',
+            'is',
+            null,
+          ) // FIX 2: Correct way to filter "IS NOT NULL"
           .limit(1)
           .maybeSingle();
 
       if (response != null && response['public_url'] != null) {
         String url = response['public_url'];
-        
+
         // Ensure it starts with https:// and doesn't end with /
         if (!url.startsWith('http')) url = 'https://$url';
         if (url.endsWith('/')) url = url.substring(0, url.length - 1);
-        
+
         return url;
       }
     } catch (e) {
-      print("Error fetching desktop URL: $e");
+      debugPrint("Error fetching desktop URL: $e");
     }
     return null;
   }
@@ -46,12 +51,12 @@ class VaultSyncService {
       final filename = path.basename(file.path);
       final url = Uri.parse('$baseUrl/vault/upload/$filename');
 
-      print("Syncing to: $url");
+      debugPrint("Syncing to: $url");
 
       final request = http.StreamedRequest('POST', url);
-      
+
       request.headers['Content-Type'] = 'application/octet-stream';
-      
+
       final fileSize = await file.length();
       request.contentLength = fileSize;
 
@@ -66,14 +71,14 @@ class VaultSyncService {
       final response = await http.Response.fromStream(await request.send());
 
       if (response.statusCode == 200) {
-        print("Upload Success: ${response.body}");
+        debugPrint("Upload Success: ${response.body}");
         return true;
       } else {
-        print("Upload Failed: ${response.statusCode} - ${response.body}");
+        debugPrint("Upload Failed: ${response.statusCode} - ${response.body}");
         return false;
       }
     } catch (e) {
-      print("Sync Error: $e");
+      debugPrint("Sync Error: $e");
       return false;
     }
   }

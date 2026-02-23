@@ -140,7 +140,7 @@ class _TutorialOverlayState extends State<TutorialOverlay>
         return FadeTransition(
           opacity: _fadeAnimation,
           child: Material(
-            color: Colors.black.withOpacity(0.7),
+            color: Colors.black.withValues(alpha: 0.7),
             child: Stack(
               children: [
                 // Highlight area
@@ -180,7 +180,7 @@ class _TutorialOverlayState extends State<TutorialOverlay>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 blurRadius: 10,
                 offset: const Offset(0, 5),
               ),
@@ -199,7 +199,7 @@ class _TutorialOverlayState extends State<TutorialOverlay>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: step.color.withOpacity(0.1),
+                      color: step.color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -320,7 +320,7 @@ class HighlightPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+      ..color = Colors.white.withValues(alpha: 0.1)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
@@ -347,7 +347,7 @@ class HighlightPainter extends CustomPainter {
 
       // Draw pulsing effect
       final pulsePaint = Paint()
-        ..color = Colors.white.withOpacity(0.3)
+        ..color = Colors.white.withValues(alpha: 0.3)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.0;
 

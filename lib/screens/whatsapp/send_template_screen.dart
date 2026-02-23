@@ -162,7 +162,7 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Send: ${widget.template.name}'),
-        backgroundColor: const Color(0xFF17A2B8),
+        backgroundColor: Colors.green,
         foregroundColor: Colors.white,
       ),
       body: ListView(
@@ -322,7 +322,7 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
               decoration: BoxDecoration(
                 color: const Color(
                   0xFFDCF8C6,
-                ).withOpacity(0.5), // Faint WhatsApp Green
+                ).withValues(alpha: 0.5), // Faint WhatsApp Green
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.green.shade200),
               ),

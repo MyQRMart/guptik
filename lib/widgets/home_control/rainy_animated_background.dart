@@ -312,7 +312,7 @@ class RainPainter extends CustomPainter {
 
       // Set raindrop properties
       rainPaint.strokeWidth = drop.size;
-      rainPaint.color = Colors.lightBlue.withOpacity(drop.opacity);
+      rainPaint.color = Colors.lightBlue.withValues(alpha: drop.opacity);
 
       // Draw raindrop as a line
       final dropLength = drop.size * 8;
@@ -328,7 +328,7 @@ class RainPainter extends CustomPainter {
       if (y > size.height * 0.8) {
         final splashPaint = Paint()
           ..style = PaintingStyle.fill
-          ..color = Colors.lightBlue.withOpacity(drop.opacity * 0.3);
+          ..color = Colors.lightBlue.withValues(alpha: drop.opacity * 0.3);
 
         canvas.drawCircle(Offset(x, y), drop.size * 0.5, splashPaint);
       }
@@ -362,7 +362,7 @@ class RainyCloudPainter extends CustomPainter {
 
       final paint = Paint()
         ..style = PaintingStyle.fill
-        ..color = cloudColor.withOpacity(cloud.opacity);
+        ..color = cloudColor.withValues(alpha: cloud.opacity);
 
       // Draw darker, more dramatic clouds
       canvas.drawCircle(center, radius, paint);
@@ -424,7 +424,7 @@ class LightningPainter extends CustomPainter {
       final currentOpacity = (lightning.opacity * flicker).clamp(0.0, 1.0);
 
       lightningPaint.strokeWidth = lightning.width;
-      lightningPaint.color = Colors.white.withOpacity(currentOpacity);
+      lightningPaint.color = Colors.white.withValues(alpha: currentOpacity);
 
       // Draw lightning bolt
       if (lightning.points.length > 1) {
@@ -448,7 +448,7 @@ class LightningPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = lightning.width * 3
           ..strokeCap = StrokeCap.round
-          ..color = Colors.blue.withOpacity(currentOpacity * 0.3);
+          ..color = Colors.blue.withValues(alpha: currentOpacity * 0.3);
 
         canvas.drawPath(path, glowPaint);
       }
@@ -460,7 +460,7 @@ class LightningPainter extends CustomPainter {
           .clamp(0.0, 0.3);
       final flashPaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = Colors.white.withOpacity(flashOpacity);
+        ..color = Colors.white.withValues(alpha: flashOpacity);
 
       canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), flashPaint);
     }

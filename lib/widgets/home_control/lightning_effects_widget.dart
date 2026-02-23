@@ -213,7 +213,7 @@ class _LightningEffectsWidgetState extends State<LightningEffectsWidget>
           builder: (context, child) {
             return Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(_backgroundFlash.value),
+                color: Colors.white.withValues(alpha: _backgroundFlash.value),
               ),
             );
           },
@@ -243,7 +243,7 @@ class _LightningEffectsWidgetState extends State<LightningEffectsWidget>
           builder: (context, child) {
             return Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(_flashOpacity.value),
+                color: Colors.white.withValues(alpha: _flashOpacity.value),
               ),
             );
           },
@@ -273,7 +273,7 @@ class LightningPainter extends CustomPainter {
 
     // Main lightning bolt (bright white)
     final mainPaint = Paint()
-      ..color = Colors.white.withOpacity(opacity)
+      ..color = Colors.white.withValues(alpha: opacity)
       ..strokeWidth = 4.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke
@@ -281,7 +281,7 @@ class LightningPainter extends CustomPainter {
 
     // Glow effect (outer)
     final glowPaint = Paint()
-      ..color = Colors.blue.withOpacity(opacity * 0.5)
+      ..color = Colors.blue.withValues(alpha: opacity * 0.5)
       ..strokeWidth = 12.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke
@@ -289,7 +289,7 @@ class LightningPainter extends CustomPainter {
 
     // Inner glow (electric blue)
     final innerGlowPaint = Paint()
-      ..color = Colors.lightBlueAccent.withOpacity(opacity * 0.7)
+      ..color = Colors.lightBlueAccent.withValues(alpha: opacity * 0.7)
       ..strokeWidth = 8.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke
@@ -313,7 +313,7 @@ class LightningPainter extends CustomPainter {
 
   void _drawLightningBranches(Canvas canvas, List<Offset> mainPath) {
     final branchPaint = Paint()
-      ..color = Colors.white.withOpacity(opacity * 0.6)
+      ..color = Colors.white.withValues(alpha: opacity * 0.6)
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke

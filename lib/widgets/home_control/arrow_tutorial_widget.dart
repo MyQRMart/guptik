@@ -226,12 +226,12 @@ class _ArrowTutorialWidgetState extends State<ArrowTutorialWidget>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: widget.color.withOpacity(0.8),
+                  color: widget.color.withValues(alpha: 0.8),
                   width: 3,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: widget.color.withOpacity(0.3),
+                    color: widget.color.withValues(alpha: 0.3),
                     blurRadius: 10,
                     spreadRadius: 2,
                   ),
@@ -273,7 +273,7 @@ class _ArrowTutorialWidgetState extends State<ArrowTutorialWidget>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -303,7 +303,7 @@ class _ArrowTutorialWidgetState extends State<ArrowTutorialWidget>
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: const Text(

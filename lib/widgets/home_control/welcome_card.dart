@@ -24,8 +24,8 @@ class WelcomeCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).colorScheme.primary.withOpacity(0.6),
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
             ],
           ),
         ),
@@ -67,7 +67,7 @@ class WelcomeCard extends StatelessWidget {
                 'You\'re all set to start controlling your smart switches. Let\'s create your first home to get started!',
                 style: GoogleFonts.poppins(
                   fontSize: 16,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,

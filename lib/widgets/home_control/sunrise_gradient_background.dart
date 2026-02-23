@@ -178,8 +178,12 @@ class SunPainter extends CustomPainter {
       );
 
       rayPaint.color = isSunset
-          ? Color.lerp(Colors.orange, Colors.red, 0.3)!.withOpacity(rayOpacity)
-          : Colors.yellow.withOpacity(rayOpacity);
+          ? Color.lerp(
+              Colors.orange,
+              Colors.red,
+              0.3,
+            )!.withValues(alpha: rayOpacity)
+          : Colors.yellow.withValues(alpha: rayOpacity);
 
       final rayStart =
           sunCenter +
@@ -196,20 +200,20 @@ class SunPainter extends CustomPainter {
 
     // Outer glow
     glowPaint.color = isSunset
-        ? Colors.orange.withOpacity(0.1)
-        : Colors.yellow.withOpacity(0.15);
+        ? Colors.orange.withValues(alpha: 0.1)
+        : Colors.yellow.withValues(alpha: 0.15);
     canvas.drawCircle(sunCenter, sunRadius * 2.5, glowPaint);
 
     // Middle glow
     glowPaint.color = isSunset
-        ? Colors.orange.withOpacity(0.3)
-        : Colors.yellow.withOpacity(0.4);
+        ? Colors.orange.withValues(alpha: 0.3)
+        : Colors.yellow.withValues(alpha: 0.4);
     canvas.drawCircle(sunCenter, sunRadius * 1.8, glowPaint);
 
     // Inner glow
     glowPaint.color = isSunset
-        ? const Color(0xFFFF6B35).withOpacity(0.6)
-        : Colors.yellow.withOpacity(0.7);
+        ? const Color(0xFFFF6B35).withValues(alpha: 0.6)
+        : Colors.yellow.withValues(alpha: 0.7);
     canvas.drawCircle(sunCenter, sunRadius * 1.3, glowPaint);
 
     // Main sun
@@ -226,7 +230,7 @@ class SunPainter extends CustomPainter {
     // Sun highlights
     final highlightPaint = Paint()
       ..style = PaintingStyle.fill
-      ..color = Colors.white.withOpacity(0.3);
+      ..color = Colors.white.withValues(alpha: 0.3);
 
     canvas.drawCircle(
       sunCenter + Offset(-sunRadius * 0.3, -sunRadius * 0.3),

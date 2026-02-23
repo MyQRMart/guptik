@@ -92,11 +92,11 @@ class _AnimatedSwitchState extends State<AnimatedSwitch>
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(widget.height),
-              color: _colorAnimation.value?.withOpacity(0.5),
+              color: _colorAnimation.value?.withValues(alpha: 0.5),
               boxShadow: [
                 BoxShadow(
                   color:
-                      _colorAnimation.value?.withOpacity(0.3) ??
+                      _colorAnimation.value?.withValues(alpha: 0.3) ??
                       Colors.transparent,
                   blurRadius: 8,
                   spreadRadius: 1,
@@ -115,7 +115,7 @@ class _AnimatedSwitchState extends State<AnimatedSwitch>
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 4,
                           spreadRadius: 1,
                         ),

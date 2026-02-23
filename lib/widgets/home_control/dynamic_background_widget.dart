@@ -188,7 +188,7 @@ class DynamicBackgroundWidget extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.3), // Foggy overlay
+          color: Colors.white.withValues(alpha: 0.3), // Foggy overlay
         ),
         child: child,
       ),

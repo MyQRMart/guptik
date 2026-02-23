@@ -181,10 +181,10 @@ class _AnimatedSwitchIconState extends State<AnimatedSwitchIcon>
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.yellow.withOpacity(0.1),
+                  color: Colors.yellow.withValues(alpha: 0.1),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.yellow.withOpacity(0.3),
+                      color: Colors.yellow.withValues(alpha: 0.3),
                       blurRadius: widget.size / 2,
                       spreadRadius: widget.size / 4,
                     ),
