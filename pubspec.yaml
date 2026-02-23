@@ -61,4 +61,6 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/images/MetaFly.png"
+  image_path: "assets/images/BH_logo.png"
+  adaptive_icon_background: "#00000000"
+  adaptive_icon_foreground: "assets/images/BH_logo.png"

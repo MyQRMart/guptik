@@ -45,11 +45,13 @@ class TemplateComponent {
   final String type;
   final String format;
   final String text;
+  final List<dynamic> buttons;
 
   TemplateComponent({
     required this.type,
     required this.format,
     required this.text,
+    this.buttons = const [],
   });
 
   factory TemplateComponent.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class TemplateComponent {
       type: json['type'] ?? '',
       format: json['format'] ?? '',
       text: json['text'] ?? '',
+      buttons: json['buttons'] ?? [],
     );
   }
 }

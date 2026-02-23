@@ -12,301 +12,314 @@ class CreateTemplateScreen extends StatefulWidget {
 }
 
 class _CreateTemplateScreenState extends State<CreateTemplateScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final String _category = 'MARKETING';
-  final String _language = 'en_US';
+  final _nameController = TextEditingController();
+  final _bodyController = TextEditingController();
+  final _footerController = TextEditingController();
+  final _headerTextController = TextEditingController();
 
-  String _name = '';
-  String _headerFormat = 'NONE';
-  String _headerText = '';
-  String _bodyText = '';
-  String _footerText = '';
+  String _selectedCategory = 'MARKETING';
+  String _selectedLanguage = 'en_US';
+  String _headerType = 'NONE';
 
-  bool _isLoading = false;
-  String _loadingStatus =
-      ''; // Tells the user what is happening in the background
-  int _variableCount = 0;
+  File? _selectedHeaderMedia;
+  bool _isCreating = false;
 
-  File? _selectedMedia;
-
-  void _onBodyTextChanged(String text) {
-    setState(() {
-      _bodyText = text;
-      _variableCount = RegExp(r'\{\{(\d+)\}\}').allMatches(text).length;
-    });
-  }
+  // NEW: List to store our buttons
+  final List<Map<String, String>> _buttons = [];
 
   Future<void> _pickMedia() async {
     FileType type = FileType.any;
-    if (_headerFormat == 'IMAGE') {
+    if (_headerType == 'IMAGE')
       type = FileType.image;
-    } else if (_headerFormat == 'VIDEO') {
+    else if (_headerType == 'VIDEO')
       type = FileType.video;
-    } else if (_headerFormat == 'DOCUMENT') {
+    else if (_headerType == 'DOCUMENT')
       type = FileType.custom;
-    }
 
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: type,
-      allowedExtensions: _headerFormat == 'DOCUMENT' ? ['pdf'] : null,
+      allowedExtensions: _headerType == 'DOCUMENT' ? ['pdf'] : null,
     );
 
     if (result != null) {
-      setState(() {
-        _selectedMedia = File(result.files.single.path!);
-      });
+      setState(() => _selectedHeaderMedia = File(result.files.single.path!));
     }
   }
 
-  Future<void> _submitTemplate() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    if (['IMAGE', 'VIDEO', 'DOCUMENT'].contains(_headerFormat) &&
-        _selectedMedia == null) {
+  // NEW: Function to add a button to the list
+  void _addButton(String type) {
+    if (_buttons.length >= 3) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select media first!'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Maximum 3 buttons allowed')),
+      );
+      return;
+    }
+    setState(() {
+      _buttons.add({'type': type, 'text': '', 'url': ''});
+    });
+  }
+
+  Future<void> _submitTemplate() async {
+    if (_nameController.text.isEmpty || _bodyController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name and Body are required')),
       );
       return;
     }
 
-    _formKey.currentState!.save();
-
-    setState(() {
-      _isLoading = true;
-      _loadingStatus = 'Processing...';
-    });
+    setState(() => _isCreating = true);
 
     try {
-      String generatedHandle = '';
-
-      // Auto-upload media to get the handle if required
-      if (_selectedMedia != null) {
-        setState(() => _loadingStatus = 'Uploading media securely to Meta...');
-        generatedHandle = await widget.apiService.uploadMediaToMeta(
-          _selectedMedia!,
-          _headerFormat,
+      String headerHandle = '';
+      if (['IMAGE', 'VIDEO', 'DOCUMENT'].contains(_headerType) &&
+          _selectedHeaderMedia != null) {
+        headerHandle = await widget.apiService.uploadMediaToMeta(
+          _selectedHeaderMedia!,
+          _headerType,
         );
+      } else if (_headerType != 'NONE' &&
+          _headerType != 'TEXT' &&
+          _selectedHeaderMedia == null) {
+        throw Exception('Please select a media file for the header');
       }
 
-      setState(() => _loadingStatus = 'Submitting template for approval...');
-
-      List<String> mockVariables = List.generate(
-        _variableCount,
-        (index) => "SampleData${index + 1}",
+      // Automatically generate dummy examples for variables like {{1}}, {{2}}
+      int variableCount = '{{'.allMatches(_bodyController.text).length;
+      List<String> bodyVariables = List.generate(
+        variableCount,
+        (index) => 'DummyValue${index + 1}',
       );
 
-      final success = await widget.apiService.createTemplate(
-        name: _name,
-        category: _category,
-        language: _language,
-        headerFormat: _headerFormat,
-        headerText: _headerText,
-        headerHandle: generatedHandle, // Use the automatically generated handle
-        bodyText: _bodyText,
-        footerText: _footerText,
-        bodyVariableExamples: mockVariables,
+      // Validate Buttons before sending
+      for (var btn in _buttons) {
+        if (btn['text']!.isEmpty) throw Exception('All buttons must have text');
+        if (btn['type'] == 'URL' && btn['url']!.isEmpty)
+          throw Exception('URL buttons must have a link');
+      }
+
+      await widget.apiService.createTemplate(
+        name: _nameController.text,
+        category: _selectedCategory,
+        language: _selectedLanguage,
+        headerFormat: _headerType,
+        headerText: _headerTextController.text,
+        headerHandle: headerHandle,
+        bodyText: _bodyController.text,
+        footerText: _footerController.text,
+        bodyVariableExamples: bodyVariables,
+        buttons: _buttons, // Pass our new buttons!
       );
 
-      if (success && mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Template submitted successfully!'),
+            content: Text('Template Created Successfully!'),
             backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
-      }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _loadingStatus = '';
-        });
-      }
+      if (mounted) setState(() => _isCreating = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final requiresMedia = [
-      'IMAGE',
-      'VIDEO',
-      'DOCUMENT',
-    ].contains(_headerFormat);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trust me Create Template'),
-        backgroundColor: Colors.green,
+        title: const Text('Create Trust me Template'),
+        backgroundColor: const Color(0xFF25D366),
         foregroundColor: Colors.white,
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // --- Basic Info ---
+          TextFormField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: 'Template Name (lowercase, no spaces)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          DropdownButtonFormField<String>(
+            value: _selectedCategory,
+            decoration: const InputDecoration(
+              labelText: 'Category',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              'MARKETING',
+              'UTILITY',
+              'AUTHENTICATION',
+            ].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+            onChanged: (v) => setState(() => _selectedCategory = v!),
+          ),
+          const SizedBox(height: 16),
+
+          // --- Header ---
+          DropdownButtonFormField<String>(
+            value: _headerType,
+            decoration: const InputDecoration(
+              labelText: 'Header Type',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              'NONE',
+              'TEXT',
+              'IMAGE',
+              'VIDEO',
+              'DOCUMENT',
+            ].map((h) => DropdownMenuItem(value: h, child: Text(h))).toList(),
+            onChanged: (v) => setState(() {
+              _headerType = v!;
+              _selectedHeaderMedia = null;
+            }),
+          ),
+          const SizedBox(height: 8),
+
+          if (_headerType == 'TEXT')
             TextFormField(
+              controller: _headerTextController,
               decoration: const InputDecoration(
-                labelText: 'Name (lowercase_only)',
+                labelText: 'Header Text',
                 border: OutlineInputBorder(),
               ),
-              validator: (v) => v!.isEmpty ? 'Required' : null,
-              onSaved: (v) => _name = v!,
             ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _headerFormat,
-              decoration: const InputDecoration(
-                labelText: 'Header Type',
-                border: OutlineInputBorder(),
+          if (['IMAGE', 'VIDEO', 'DOCUMENT'].contains(_headerType))
+            ElevatedButton.icon(
+              onPressed: _pickMedia,
+              icon: const Icon(Icons.upload_file),
+              label: Text(
+                _selectedHeaderMedia == null
+                    ? 'Select $_headerType File'
+                    : 'File Selected: ${_selectedHeaderMedia!.path.split('/').last}',
               ),
-              items: [
-                'NONE',
-                'TEXT',
-                'IMAGE',
-                'VIDEO',
-                'DOCUMENT',
-              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: (v) {
-                setState(() {
-                  _headerFormat = v!;
-                  _selectedMedia = null;
-                });
-              },
             ),
+          const SizedBox(height: 16),
 
-            if (_headerFormat == 'TEXT') ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'Header Text',
-                  border: OutlineInputBorder(),
-                ),
-                onSaved: (v) => _headerText = v ?? '',
-              ),
-            ],
+          // --- Body & Footer ---
+          TextFormField(
+            controller: _bodyController,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Body Text (Use {{1}}, {{2}} for variables)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _footerController,
+            decoration: const InputDecoration(
+              labelText: 'Footer Text (Optional)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 24),
 
-            if (requiresMedia) ...[
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: _pickMedia,
-                child: Container(
-                  height: 180,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.grey[400]!,
-                      style: BorderStyle.solid,
-                    ),
-                  ),
-                  child: _selectedMedia != null
-                      ? _headerFormat == 'IMAGE'
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.file(
-                                  _selectedMedia!,
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  'Selected: ${_selectedMedia!.path.split('/').last}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _headerFormat == 'IMAGE'
-                                  ? Icons.image
-                                  : _headerFormat == 'VIDEO'
-                                  ? Icons.videocam
-                                  : Icons.insert_drive_file,
-                              size: 48,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Tap to select $_headerFormat',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+          // --- NEW: BUTTONS SECTION ---
+          const Text(
+            'Buttons (Optional)',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          ..._buttons.asMap().entries.map((entry) {
+            int index = entry.key;
+            var btn = entry.value;
+            return Card(
+              color: Colors.grey[100],
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          btn['type'] == 'QUICK_REPLY'
+                              ? 'Quick Reply Button'
+                              : 'Visit Website Button',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () =>
+                              setState(() => _buttons.removeAt(index)),
+                        ),
+                      ],
+                    ),
+                    TextFormField(
+                      initialValue: btn['text'],
+                      decoration: const InputDecoration(
+                        labelText: 'Button Text (e.g. "Yes", "Buy Now")',
+                      ),
+                      onChanged: (val) => btn['text'] = val,
+                    ),
+                    if (btn['type'] == 'URL')
+                      TextFormField(
+                        initialValue: btn['url'],
+                        decoration: const InputDecoration(
+                          labelText: 'Website URL (https://...)',
+                        ),
+                        onChanged: (val) => btn['url'] = val,
+                      ),
+                  ],
                 ),
               ),
-            ],
+            );
+          }).toList(),
 
-            const SizedBox(height: 16),
-            TextFormField(
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Body Text (Use {{1}} for variables)',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: _onBodyTextChanged,
-              validator: (v) => v!.isEmpty ? 'Required' : null,
+          if (_buttons.length < 3)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _addButton('QUICK_REPLY'),
+                    icon: const Icon(Icons.reply),
+                    label: const Text('Add Quick Reply'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _addButton('URL'),
+                    icon: const Icon(Icons.link),
+                    label: const Text('Add URL Button'),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              decoration: const InputDecoration(
-                labelText: 'Footer Text (Optional)',
-                border: OutlineInputBorder(),
-              ),
-              onSaved: (v) => _footerText = v ?? '',
-            ),
-            const SizedBox(height: 24),
 
-            if (_isLoading)
-              Column(
-                children: [
-                  const CircularProgressIndicator(color: Colors.green),
-                  const SizedBox(height: 8),
-                  Text(
-                    _loadingStatus,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
+          const SizedBox(height: 32),
+
+          // --- Submit ---
+          _isCreating
+              ? const Center(child: CircularProgressIndicator())
+              : ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    padding: const EdgeInsets.all(16),
+                  ),
+                  onPressed: _submitTemplate,
+                  child: const Text(
+                    'Create Template',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-              )
-            else
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(16),
                 ),
-                onPressed: _submitTemplate,
-                child: const Text(
-                  'Submit to Meta',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }

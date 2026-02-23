@@ -121,6 +121,7 @@ class MetaApiService {
     required String bodyText,
     required String footerText,
     required List<String> bodyVariableExamples,
+    List<Map<String, String>> buttons = const [],
   }) async {
     final formattedName = name.trim().toLowerCase().replaceAll(' ', '_');
     final url = Uri.parse('$baseUrl/$businessAccountId/message_templates');
@@ -149,6 +150,23 @@ class MetaApiService {
 
     if (footerText.isNotEmpty)
       components.add({'type': 'FOOTER', 'text': footerText});
+
+    // 4. NEW: Buttons
+    if (buttons.isNotEmpty) {
+      List<Map<String, dynamic>> formattedButtons = [];
+      for (var btn in buttons) {
+        if (btn['type'] == 'QUICK_REPLY') {
+          formattedButtons.add({'type': 'QUICK_REPLY', 'text': btn['text']});
+        } else if (btn['type'] == 'URL') {
+          formattedButtons.add({
+            'type': 'URL',
+            'text': btn['text'],
+            'url': btn['url'],
+          });
+        }
+      }
+      components.add({'type': 'BUTTONS', 'buttons': formattedButtons});
+    }
 
     final payload = {
       "name": formattedName,

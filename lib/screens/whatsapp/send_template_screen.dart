@@ -105,7 +105,8 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
           // If they pasted a link, we use that
           finalMediaLink = _mediaUrlFallback;
         } else {
-          //  throw Exception('Please select an image/video or paste a link.');
+          // Fixed the accidentally commented-out exception
+          throw Exception('Please select an image/video or paste a link.');
         }
       }
 
@@ -152,6 +153,11 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
     final requiresMedia =
         headerFormat != null &&
         ['IMAGE', 'VIDEO', 'DOCUMENT'].contains(headerFormat);
+
+    // Grab buttons if they exist
+    final buttonsComponent = widget.template.components
+        .where((c) => c.type == 'BUTTONS')
+        .firstOrNull;
 
     return Scaffold(
       appBar: AppBar(
@@ -206,7 +212,7 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.check_circle,
                                     color: Colors.green,
                                     size: 40,
@@ -291,9 +297,65 @@ class _SendTemplateScreenState extends State<SendTemplateScreen> {
                 ),
               );
             }),
+            const SizedBox(height: 12),
           ],
 
-          const SizedBox(height: 24),
+          // --- NEW: Included Buttons Visualizer ---
+          if (buttonsComponent != null &&
+              buttonsComponent.buttons.isNotEmpty) ...[
+            const Text(
+              'Included Buttons',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'These will be attached automatically by WhatsApp.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(
+                  0xFFDCF8C6,
+                ).withOpacity(0.5), // Faint WhatsApp Green
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Column(
+                children: buttonsComponent.buttons.map((btn) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          btn['type'] == 'URL'
+                              ? Icons.open_in_new
+                              : Icons.reply,
+                          color: const Color(0xFF00A884),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          btn['text'] ?? 'Button',
+                          style: const TextStyle(
+                            color: Color(0xFF00A884),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // --- Send Button ---
           if (_isSending)

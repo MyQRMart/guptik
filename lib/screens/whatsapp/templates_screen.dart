@@ -69,14 +69,16 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
     }
   }
 
-  // --- NEW: WhatsApp-style Preview Dialog ---
+  // --- UPDATED: WhatsApp-style Preview Dialog (Now with Buttons!) ---
   void _showTemplatePreview(BuildContext context, WhatsAppTemplate template) {
     final header = template.header;
     final body = template.body;
-    // Find footer if it exists
     final footer = template.components
         .where((c) => c.type == 'FOOTER')
         .firstOrNull;
+    final buttonsComponent = template.components
+        .where((c) => c.type == 'BUTTONS')
+        .firstOrNull; // <-- GRAB BUTTONS
     final isApproved = template.status.toUpperCase() == 'APPROVED';
 
     showDialog(
@@ -90,7 +92,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
             decoration: BoxDecoration(
               color: const Color(
                 0xFFE5DDD5,
-              ), // Classic WhatsApp chat background color
+              ), // Classic WhatsApp chat background
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
@@ -108,13 +110,11 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
 
                 // The Chat Bubble
                 Align(
-                  alignment: Alignment
-                      .centerRight, // Align to right like an outgoing message
+                  alignment: Alignment.centerRight,
                   child: Container(
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.75,
                     ),
-                    padding: const EdgeInsets.all(12),
                     decoration: const BoxDecoration(
                       color: Color(0xFFDCF8C6), // WhatsApp Light Green Bubble
                       borderRadius: BorderRadius.only(
@@ -136,60 +136,112 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header Section
-                        if (header != null) ...[
-                          if (header.format == 'TEXT')
-                            Text(
-                              header.text,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Colors.black,
-                              ),
-                            )
-                          else
-                            Container(
-                              height: 140,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.black12,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                header.format == 'IMAGE'
-                                    ? Icons.image
-                                    : header.format == 'VIDEO'
-                                    ? Icons.videocam
-                                    : Icons.insert_drive_file,
-                                size: 48,
-                                color: Colors.black38,
-                              ),
-                            ),
-                          const SizedBox(height: 8),
-                        ],
+                        // Padding for the main text/media area
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Header Section
+                              if (header != null) ...[
+                                if (header.format == 'TEXT')
+                                  Text(
+                                    header.text,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: Colors.black,
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    height: 140,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black12,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      header.format == 'IMAGE'
+                                          ? Icons.image
+                                          : header.format == 'VIDEO'
+                                          ? Icons.videocam
+                                          : Icons.insert_drive_file,
+                                      size: 48,
+                                      color: Colors.black38,
+                                    ),
+                                  ),
+                                const SizedBox(height: 8),
+                              ],
 
-                        // Body Section
-                        if (body != null)
-                          Text(
-                            body.text,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: Colors.black87,
-                              height: 1.3,
-                            ),
-                          ),
+                              // Body Section
+                              if (body != null)
+                                Text(
+                                  body.text,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.black87,
+                                    height: 1.3,
+                                  ),
+                                ),
 
-                        // Footer Section
-                        if (footer != null) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            footer.text,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
+                              // Footer Section
+                              if (footer != null) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  footer.text,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
+                        ),
+
+                        // --- NEW: DRAWING THE BUTTONS ---
+                        if (buttonsComponent != null &&
+                            buttonsComponent.buttons.isNotEmpty)
+                          ...buttonsComponent.buttons.map((btn) {
+                            return Column(
+                              children: [
+                                const Divider(
+                                  height: 1,
+                                  thickness: 1,
+                                  color: Colors.black12,
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        btn['type'] == 'URL'
+                                            ? Icons.open_in_new
+                                            : Icons.reply,
+                                        color: const Color(
+                                          0xFF00A884,
+                                        ), // WhatsApp button color
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        btn['text'] ?? 'Button',
+                                        style: const TextStyle(
+                                          color: Color(0xFF00A884),
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
                       ],
                     ),
                   ),
@@ -293,8 +345,9 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
   }
 
   Widget _buildBody() {
-    if (_isLoadingSettings)
+    if (_isLoadingSettings) {
       return const Center(child: CircularProgressIndicator());
+    }
 
     if (!_hasConfiguredKeys) {
       return Center(
@@ -320,10 +373,12 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
     return FutureBuilder<List<WhatsAppTemplate>>(
       future: _templatesFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        if (!snapshot.hasData || snapshot.data!.isEmpty)
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(child: Text('No templates found.'));
+        }
 
         final templates = snapshot.data!;
         return ListView.builder(
@@ -340,7 +395,6 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ListTile(
-                // NEW: Tapping the tile opens the preview!
                 onTap: () => _showTemplatePreview(context, template),
                 title: Text(
                   template.name,
