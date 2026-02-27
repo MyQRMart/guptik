@@ -1,21 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// ADDED: Import the Facebook Auth package
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 class FacebookAndInstagramScreen extends StatefulWidget {
   const FacebookAndInstagramScreen({super.key});
 
   @override
-  State<FacebookAndInstagramScreen> createState() => _FacebookAndInstagramScreenState();
+  State<FacebookAndInstagramScreen> createState() =>
+      _FacebookAndInstagramScreenState();
 }
 
-class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen> {
+class _FacebookAndInstagramScreenState
+    extends State<FacebookAndInstagramScreen> {
   final List<Map<String, dynamic>> _accounts = [];
 
-  final TextEditingController _instagramTokenController = TextEditingController();
-  final TextEditingController _instagramAccountIdController = TextEditingController();
-  final TextEditingController _facebookTokenController = TextEditingController();
-  final TextEditingController _facebookAccountIdController = TextEditingController();
+  final TextEditingController _instagramTokenController =
+      TextEditingController();
+  final TextEditingController _instagramAccountIdController =
+      TextEditingController();
+  final TextEditingController _facebookTokenController =
+      TextEditingController();
+  final TextEditingController _facebookAccountIdController =
+      TextEditingController();
 
   bool _isLoading = false;
 
@@ -48,11 +56,11 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
           .maybeSingle();
 
       if (mounted && response != null) {
-        // UPDATED: Check for 'facebook_user_access_token' instead of 'facebook_access_token'
-        bool hasData = response['instagram_access_token'] != null || 
-                       response['instagram_account_id'] != null ||
-                       response['facebook_user_access_token'] != null || 
-                       response['facebook_account_id'] != null;
+        bool hasData =
+            response['instagram_access_token'] != null ||
+            response['instagram_account_id'] != null ||
+            response['facebook_user_access_token'] != null ||
+            response['facebook_account_id'] != null;
 
         if (hasData) {
           setState(() {
@@ -61,16 +69,18 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
               'id': response['id'],
               'instagram_token': response['instagram_access_token'],
               'instagram_account_id': response['instagram_account_id'],
-              // UPDATED KEY:
-              'facebook_token': response['facebook_user_access_token'], 
+              'facebook_token': response['facebook_user_access_token'],
               'facebook_account_id': response['facebook_account_id'],
             });
 
-            _instagramTokenController.text = response['instagram_access_token'] ?? '';
-            _instagramAccountIdController.text = response['instagram_account_id'] ?? '';
-            // UPDATED KEY:
-            _facebookTokenController.text = response['facebook_user_access_token'] ?? '';
-            _facebookAccountIdController.text = response['facebook_account_id'] ?? '';
+            _instagramTokenController.text =
+                response['instagram_access_token'] ?? '';
+            _instagramAccountIdController.text =
+                response['instagram_account_id'] ?? '';
+            _facebookTokenController.text =
+                response['facebook_user_access_token'] ?? '';
+            _facebookAccountIdController.text =
+                response['facebook_account_id'] ?? '';
           });
         }
       }
@@ -84,7 +94,7 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
   // --- 2. SAVE LOGIC ---
   Future<void> _saveSettingsToSupabase() async {
     try {
-      Navigator.pop(context); 
+      Navigator.pop(context);
       setState(() => _isLoading = true);
 
       final user = Supabase.instance.client.auth.currentUser;
@@ -92,11 +102,18 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
 
       final data = {
         'user_id': user.id,
-        'instagram_access_token': _instagramTokenController.text.isEmpty ? null : _instagramTokenController.text,
-        'instagram_account_id': _instagramAccountIdController.text.isEmpty ? null : _instagramAccountIdController.text,
-        // UPDATED COLUMN NAME:
-        'facebook_user_access_token': _facebookTokenController.text.isEmpty ? null : _facebookTokenController.text,
-        'facebook_account_id': _facebookAccountIdController.text.isEmpty ? null : _facebookAccountIdController.text,
+        'instagram_access_token': _instagramTokenController.text.isEmpty
+            ? null
+            : _instagramTokenController.text,
+        'instagram_account_id': _instagramAccountIdController.text.isEmpty
+            ? null
+            : _instagramAccountIdController.text,
+        'facebook_user_access_token': _facebookTokenController.text.isEmpty
+            ? null
+            : _facebookTokenController.text,
+        'facebook_account_id': _facebookAccountIdController.text.isEmpty
+            ? null
+            : _facebookAccountIdController.text,
       };
 
       final response = await Supabase.instance.client
@@ -111,7 +128,6 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
           'id': response['id'],
           'instagram_token': response['instagram_access_token'],
           'instagram_account_id': response['instagram_account_id'],
-          // UPDATED KEY:
           'facebook_token': response['facebook_user_access_token'],
           'facebook_account_id': response['facebook_account_id'],
         });
@@ -124,9 +140,9 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -138,7 +154,7 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
     try {
       final accountId = _accounts[index]['id'];
       if (accountId == null) return;
-      
+
       setState(() => _isLoading = true);
 
       await Supabase.instance.client
@@ -146,26 +162,67 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
           .update({
             'instagram_access_token': null,
             'instagram_account_id': null,
-            // UPDATED COLUMN NAME:
             'facebook_user_access_token': null,
             'facebook_account_id': null,
           })
           .eq('id', accountId);
 
+      if (!mounted) return; // FIX: Added mounted check
       setState(() {
-        _accounts.clear(); 
+        _accounts.clear();
         _instagramTokenController.clear();
         _instagramAccountIdController.clear();
         _facebookTokenController.clear();
         _facebookAccountIdController.clear();
       });
-      
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error removing settings: $e')),
-      );
+      if (!mounted) return; // FIX: Added mounted check for the SnackBar
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error removing settings: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- 4. FACEBOOK LOGIN LOGIC ADDED HERE ---
+  Future<void> _handleFacebookLogin() async {
+    try {
+      final LoginResult result = await FacebookAuth.instance.login(
+        permissions: ['email', 'public_profile'],
+      );
+
+      if (result.status == LoginStatus.success) {
+        final AccessToken accessToken = result.accessToken!;
+
+        // NEW FIX: Fetch user data to get the Account ID
+        final userData = await FacebookAuth.instance.getUserData();
+
+        // Auto-fill the text fields with the fetched data
+        _facebookTokenController.text = accessToken.tokenString;
+        _facebookAccountIdController.text =
+            userData['id']; // Gets ID from userData now
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Facebook connected! Click Save to confirm.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else if (result.status == LoginStatus.cancelled) {
+        debugPrint("User cancelled the login.");
+      } else {
+        debugPrint("Login Error: ${result.message}");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login Error: ${result.message}')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("An error occurred: $e");
     }
   }
 
@@ -209,7 +266,7 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
                     style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 30),
-                  
+
                   if (_accounts.isEmpty)
                     _buildEmptyState()
                   else
@@ -243,10 +300,11 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
             ElevatedButton(
               onPressed: _showConfigDialog,
               style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF17A2B8),
-                  foregroundColor: Colors.white),
+                backgroundColor: const Color(0xFF17A2B8),
+                foregroundColor: Colors.white,
+              ),
               child: const Text("Connect Accounts"),
-            )
+            ),
           ],
         ),
       ),
@@ -291,19 +349,39 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
               ],
             ),
             const Divider(),
-            
-            if (account['instagram_token'] != null || account['instagram_account_id'] != null) ...[
-                const Text("Instagram", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink)),
-                _buildInfoRow("Account ID", account['instagram_account_id'] ?? 'Not Set'),
-                _buildInfoRow("Token", maskToken(account['instagram_token'])),
-                const SizedBox(height: 12),
+
+            if (account['instagram_token'] != null ||
+                account['instagram_account_id'] != null) ...[
+              const Text(
+                "Instagram",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.pink,
+                ),
+              ),
+              _buildInfoRow(
+                "Account ID",
+                account['instagram_account_id'] ?? 'Not Set',
+              ),
+              _buildInfoRow("Token", maskToken(account['instagram_token'])),
+              const SizedBox(height: 12),
             ],
-            
-            if (account['facebook_token'] != null || account['facebook_account_id'] != null) ...[
-                const Text("Facebook", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                _buildInfoRow("Account ID", account['facebook_account_id'] ?? 'Not Set'),
-                _buildInfoRow("Token", maskToken(account['facebook_token'])),
-            ]
+
+            if (account['facebook_token'] != null ||
+                account['facebook_account_id'] != null) ...[
+              const Text(
+                "Facebook",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+              _buildInfoRow(
+                "Account ID",
+                account['facebook_account_id'] ?? 'Not Set',
+              ),
+              _buildInfoRow("Token", maskToken(account['facebook_token'])),
+            ],
           ],
         ),
       ),
@@ -316,15 +394,27 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
       child: Row(
         children: [
           SizedBox(
-            width: 100, 
-            child: Text("$label:", style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.grey))
+            width: 100,
+            child: Text(
+              "$label:",
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey,
+              ),
+            ),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           if (value != 'Not Set')
             InkWell(
               onTap: () => Clipboard.setData(ClipboardData(text: value)),
               child: const Icon(Icons.copy, size: 14, color: Colors.grey),
-            )
+            ),
         ],
       ),
     );
@@ -339,13 +429,19 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Instagram", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink)),
+              const Text(
+                "Instagram",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.pink,
+                ),
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: _instagramTokenController,
                 decoration: const InputDecoration(
-                  labelText: 'Access Token', 
-                  border: OutlineInputBorder(), 
+                  labelText: 'Access Token',
+                  border: OutlineInputBorder(),
                   isDense: true,
                   prefixIcon: Icon(Icons.key, size: 18),
                 ),
@@ -354,20 +450,51 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
               TextField(
                 controller: _instagramAccountIdController,
                 decoration: const InputDecoration(
-                  labelText: 'Account ID', 
-                  border: OutlineInputBorder(), 
+                  labelText: 'Account ID',
+                  border: OutlineInputBorder(),
                   isDense: true,
                   prefixIcon: Icon(Icons.numbers, size: 18),
                 ),
               ),
               const Divider(height: 30),
-              const Text("Facebook", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+              const Text(
+                "Facebook",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
               const SizedBox(height: 10),
+
+              // ==========================================
+              // NEW: AUTOMATIC FACEBOOK LOGIN BUTTON
+              // ==========================================
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _handleFacebookLogin,
+                  icon: const Icon(Icons.facebook, color: Colors.white),
+                  label: const Text("Auto-Connect with Facebook"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1877F2), // Facebook Blue
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Or enter manually:",
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+
+              // ==========================================
               TextField(
                 controller: _facebookTokenController,
                 decoration: const InputDecoration(
-                  labelText: 'Access Token', 
-                  border: OutlineInputBorder(), 
+                  labelText: 'Access Token',
+                  border: OutlineInputBorder(),
                   isDense: true,
                   prefixIcon: Icon(Icons.key, size: 18),
                 ),
@@ -376,8 +503,8 @@ class _FacebookAndInstagramScreenState extends State<FacebookAndInstagramScreen>
               TextField(
                 controller: _facebookAccountIdController,
                 decoration: const InputDecoration(
-                  labelText: 'Account ID', 
-                  border: OutlineInputBorder(), 
+                  labelText: 'Account ID',
+                  border: OutlineInputBorder(),
                   isDense: true,
                   prefixIcon: Icon(Icons.numbers, size: 18),
                 ),

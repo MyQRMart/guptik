@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">guptik</string>
+
+    <string name="facebook_app_id">1647936262889799</string>
+    <string name="fb_login_protocol_scheme">fb1647936262889799</string>
+    <string name="facebook_client_token">1647936262889799|KR_eLtBYrl1LuhZ6g0b1GEYuPz8</string>
+</resources>

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:guptik/models/facebook/meta_content_model.dart';
-
+import 'package:guptik/widgets/facebook/auto_reply_dialog.dart';
 
 class MetaGridCard extends StatelessWidget {
   final MetaContent content;
@@ -29,15 +29,79 @@ class MetaGridCard extends StatelessWidget {
           Expanded(
             child: Stack(
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                    image: DecorationImage(
-                      image: NetworkImage(content.imageUrl),
+                // -------------------------------------------------------------
+                // ✅ FIXED: Replaced DecorationImage with Image.network + errorBuilder
+                // -------------------------------------------------------------
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(12),
+                    ),
+                    child: Image.network(
+                      content.imageUrl,
                       fit: BoxFit.cover,
+                      // If the image fails to load, it shows this instead of crashing!
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Center(
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                              size: 30,
+                            ),
+                          ),
+                        );
+                      },
+                      // Adds a smooth loading spinner while the image downloads
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: Colors.grey[100],
+                          child: const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
+
+                // -------------------------------------------------------------
+                // NEW: Settings Button (Top-Left) - Only for Instagram
+                // -------------------------------------------------------------
+                if (content.platform == SocialPlatform.instagram)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: GestureDetector(
+                      onTap: () {
+                        // Prevent the card tap from firing and open the dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) =>
+                              AutoReplyDialog(postId: content.id),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.settings,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // -------------------------------------------------------------
+                // EXISTING: Platform Icon (Top-Right)
+                // -------------------------------------------------------------
                 Positioned(
                   top: 8,
                   right: 8,
@@ -61,6 +125,7 @@ class MetaGridCard extends StatelessWidget {
               ],
             ),
           ),
+
           // Info Section
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -69,7 +134,10 @@ class MetaGridCard extends StatelessWidget {
               children: [
                 Text(
                   content.caption,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

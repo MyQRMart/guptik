@@ -159,7 +159,7 @@ class _WhatsAppNumbersScreenState extends State<WhatsAppNumbersScreen> {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text(
-          'Trust me Settings',
+          'WhatsApp Business Settings',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         backgroundColor: const Color(0xFF17A2B8),
