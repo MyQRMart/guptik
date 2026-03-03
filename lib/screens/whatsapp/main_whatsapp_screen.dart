@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:guptik/screens/whatsapp/messages_screen.dart';
-import 'package:guptik/screens/whatsapp/templates_screen.dart';
+import 'package:guptik/screens/whatsapp/whastapp_template_manager_screen.dart';
 import 'package:guptik/screens/whatsapp/settings_screen.dart';
 
 class Whatsapp extends StatefulWidget {
@@ -18,7 +18,7 @@ class _WhatsappState extends State<Whatsapp> {
       _selectedIndex = index;
     });
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,7 +26,7 @@ class _WhatsappState extends State<Whatsapp> {
         index: _selectedIndex,
         children: const [
           MessagesScreen(),
-          TemplatesScreen(),
+          WhatsAppTemplateManagerScreen(),
           SettingsScreen(),
         ],
       ),
@@ -39,10 +39,7 @@ class _WhatsappState extends State<Whatsapp> {
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Messages'),
           BottomNavigationBarItem(
             icon: Icon(Icons.format_quote),
             label: 'Templates',

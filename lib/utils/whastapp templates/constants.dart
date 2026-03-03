@@ -1,0 +1,70 @@
+class Constants {
+  // Categories for templates
+  static const List<String> categories = [
+    'MARKETING',
+    'UTILITY',
+    'AUTHENTICATION',
+  ];
+
+  // Supported languages
+  static const List<String> languages = [
+    'en_US',
+    'af',
+    'ar',
+    'bn',
+    'bg',
+    'ca',
+    'zh_CN',
+    'zh_HK',
+    'zh_TW',
+    'hr',
+    'cs',
+    'da',
+    'nl',
+    'de',
+    'el',
+    'en',
+    'es',
+    'fi',
+    'fr',
+    'gu',
+    'he',
+    'hi',
+    'hu',
+    'id',
+    'it',
+    'ja',
+    'kn',
+    'ko',
+    'ml',
+    'mr',
+    'ms',
+    'nb',
+    'nl',
+    'pa',
+    'pl',
+    'pt',
+    'ro',
+    'ru',
+    'sk',
+    'sv',
+    'ta',
+    'te',
+    'th',
+    'tl',
+    'tr',
+    'uk',
+    'ur',
+    'vi',
+    'zh',
+  ];
+
+  // Header types
+  static const List<String> headerTypes = [
+    'NONE',
+    'TEXT',
+    'IMAGE',
+    'VIDEO',
+    'DOCUMENT',
+  ];
+}

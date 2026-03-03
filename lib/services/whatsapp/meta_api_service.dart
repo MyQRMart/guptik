@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // REQUIRED FOR MEDIA TYPE
-import 'package:guptik/models/whatsapp/template_model.dart'; // Adjust path if needed
+import 'package:guptik/models/whatsapp/template.dart'; // Adjust path if needed
 
 class MetaApiService {
   final String accessToken;

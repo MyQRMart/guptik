@@ -2094,14 +2094,71 @@ class _HomeScreenState extends State<HomeScreen> {
                     Flexible(
                       fit: FlexFit.tight,
                       child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const GuptikScreen(),
+                        onTap: () async {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => const Center(
+                              child: CircularProgressIndicator(),
                             ),
                           );
+
+                          try {
+                            final userId =
+                                Supabase.instance.client.auth.currentUser!.id;
+
+                            final data = await Supabase.instance.client
+                                .from('desktop_devices')
+                                .select('public_url, status')
+                                .eq('user_id', userId)
+                                .single();
+
+                            if (context.mounted) Navigator.pop(context);
+
+                            if (data['status'] != 'online') {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Your desktop is currently offline. Please turn it on.',
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
+                            // --- THE FIX: ADDING HTTPS ---
+                            String rawUrl = data['public_url'] ?? '';
+                            if (!rawUrl.startsWith('http')) {
+                              rawUrl = 'https://$rawUrl';
+                            }
+                            // -----------------------------
+
+                            if (context.mounted && rawUrl.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      GuptikScreen(tunnelUrl: rawUrl),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) Navigator.pop(context);
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Could not find your desktop device.',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
                         },
+
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 5),
                           padding: const EdgeInsets.all(12),
