@@ -7,7 +7,7 @@ class SyncTracker {
   static Future<void> markAsSynced(String assetId) async {
     final prefs = await SharedPreferences.getInstance();
     final List<String> syncedIds = prefs.getStringList(_key) ?? [];
-    
+
     if (!syncedIds.contains(assetId)) {
       syncedIds.add(assetId);
       await prefs.setStringList(_key, syncedIds);
@@ -25,5 +25,16 @@ class SyncTracker {
     final prefs = await SharedPreferences.getInstance();
     final List<String> ids = prefs.getStringList(_key) ?? [];
     return ids.contains(assetId);
+  }
+
+  // REMOVE a synced ID if it was deleted on the desktop
+  static Future<void> removeSyncedId(String assetId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> syncedIds = prefs.getStringList(_key) ?? [];
+
+    if (syncedIds.contains(assetId)) {
+      syncedIds.remove(assetId);
+      await prefs.setStringList(_key, syncedIds);
+    }
   }
 }

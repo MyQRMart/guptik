@@ -11,30 +11,31 @@ class VaultSyncService {
       final SupabaseClient supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser?.id;
 
-      // FIX 1: Ensure userId is not null before using it
       if (userId == null) {
         debugPrint("User not logged in");
         return null;
       }
 
-      // Fetch the first active desktop device for this user
       final response = await supabase
           .from('desktop_devices')
           .select('public_url')
-          .eq('user_id', userId) // Now safe because we checked for null above
-          .not(
-            'public_url',
-            'is',
-            null,
-          ) // FIX 2: Correct way to filter "IS NOT NULL"
+          .eq('user_id', userId)
+          .not('public_url', 'is', null)
           .limit(1)
           .maybeSingle();
 
       if (response != null && response['public_url'] != null) {
         String url = response['public_url'];
 
-        // Ensure it starts with https:// and doesn't end with /
-        if (!url.startsWith('http')) url = 'https://$url';
+        // FIX: Check if it's a local IP address (starts with a number)
+        if (!url.startsWith('http')) {
+          if (url.startsWith(RegExp(r'[0-9]'))) {
+            url = 'http://$url'; // Local network MUST use http
+          } else {
+            url = 'https://$url'; // External domains (like ngrok) use https
+          }
+        }
+
         if (url.endsWith('/')) url = url.substring(0, url.length - 1);
 
         return url;
@@ -48,27 +49,24 @@ class VaultSyncService {
   // 2. Upload a single file to the Gateway
   Future<bool> uploadFile(File file, String baseUrl) async {
     try {
-      final filename = path.basename(file.path);
-      final url = Uri.parse('$baseUrl/vault/upload/$filename');
-
-      debugPrint("Syncing to: $url");
-
-      final request = http.StreamedRequest('POST', url);
-
-      request.headers['Content-Type'] = 'application/octet-stream';
+      // KEEP the encodeComponent for the URL route so the HTTP request doesn't crash
+      final urlEncodedName = Uri.encodeComponent(path.basename(file.path));
+      final url = Uri.parse('$baseUrl/vault/upload/$urlEncodedName');
 
       final fileSize = await file.length();
-      request.contentLength = fileSize;
+      if (fileSize == 0) {
+        debugPrint("File is empty, aborting.");
+        return false;
+      }
 
-      // Pipe the file stream directly to the request
-      file.openRead().listen(
-        (chunk) => request.sink.add(chunk),
-        onDone: () => request.sink.close(),
-        onError: (e) => request.sink.addError(e),
-        cancelOnError: true,
-      );
+      debugPrint("Syncing to: $url (Size: $fileSize bytes)");
 
-      final response = await http.Response.fromStream(await request.send());
+      final request = http.Request('POST', url);
+      request.headers['Content-Type'] = 'application/octet-stream';
+      request.bodyBytes = await file.readAsBytes();
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         debugPrint("Upload Success: ${response.body}");
