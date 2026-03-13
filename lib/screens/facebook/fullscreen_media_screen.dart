@@ -5,7 +5,7 @@ class FullScreenMediaScreen extends StatelessWidget {
   final String caption;
 
   const FullScreenMediaScreen({
-    super.key, 
+    super.key,
     required this.imageUrl,
     this.caption = '',
   });
@@ -31,11 +31,12 @@ class FullScreenMediaScreen extends StatelessWidget {
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.contain,
-                errorBuilder: (ctx, _, __) => const Icon(Icons.broken_image, color: Colors.white),
+                errorBuilder: (ctx, _, __) =>
+                    const Icon(Icons.broken_image, color: Colors.white),
               ),
             ),
           ),
-          
+
           // Caption at bottom
           if (caption.isNotEmpty)
             Positioned(
@@ -56,7 +57,7 @@ class FullScreenMediaScreen extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            )
+            ),
         ],
       ),
     );

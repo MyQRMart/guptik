@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/home_control/switch_model.dart';
 // ✅ FIX 1: Re-added missing import
-import '../../models/home_control/switch_type.dart'; 
+import '../../models/home_control/switch_type.dart';
 import '../../models/home_control/timer_model.dart';
 
 enum TimerType { scheduled, prescheduled, countdown }
@@ -56,9 +56,9 @@ class _TimerScreenState extends State<TimerScreen> {
       if (!mounted) return;
 
       setState(() {
-        _timers = List<Map<String, dynamic>>.from(response)
-            .map((data) => SwitchTimer.fromJson(data))
-            .toList();
+        _timers = List<Map<String, dynamic>>.from(
+          response,
+        ).map((data) => SwitchTimer.fromJson(data)).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -72,44 +72,66 @@ class _TimerScreenState extends State<TimerScreen> {
   // Helper: Convert Day String to Integer for DB (1=Mon ... 7=Sun)
   int _dayToInt(String day) {
     switch (day) {
-      case 'Mon': return 1;
-      case 'Tue': return 2;
-      case 'Wed': return 3;
-      case 'Thu': return 4;
-      case 'Fri': return 5;
-      case 'Sat': return 6;
-      case 'Sun': return 7;
-      default: return 1;
+      case 'Mon':
+        return 1;
+      case 'Tue':
+        return 2;
+      case 'Wed':
+        return 3;
+      case 'Thu':
+        return 4;
+      case 'Fri':
+        return 5;
+      case 'Sat':
+        return 6;
+      case 'Sun':
+        return 7;
+      default:
+        return 1;
     }
   }
 
   // Helper: Convert Integer to String for Display
   String _intToDay(int day) {
     switch (day) {
-      case 1: return 'Mon';
-      case 2: return 'Tue';
-      case 3: return 'Wed';
-      case 4: return 'Thu';
-      case 5: return 'Fri';
-      case 6: return 'Sat';
-      case 7: return 'Sun';
-      default: return '';
+      case 1:
+        return 'Mon';
+      case 2:
+        return 'Tue';
+      case 3:
+        return 'Wed';
+      case 4:
+        return 'Thu';
+      case 5:
+        return 'Fri';
+      case 6:
+        return 'Sat';
+      case 7:
+        return 'Sun';
+      default:
+        return '';
     }
   }
 
   Future<void> _showAddTimerDialog() async {
     TimeOfDay selectedTime = TimeOfDay.now();
-    
+
     SwitchDevice? selectedSwitch;
     // Logic to select initial switch safely
     if (widget.initialSwitchId != null) {
       try {
-        selectedSwitch = widget.switches.firstWhere((s) => s.id == widget.initialSwitchId);
+        selectedSwitch = widget.switches.firstWhere(
+          (s) => s.id == widget.initialSwitchId,
+        );
       } catch (_) {
-        selectedSwitch = widget.switches.isNotEmpty ? widget.switches.first : null;
+        selectedSwitch = widget.switches.isNotEmpty
+            ? widget.switches.first
+            : null;
       }
     } else {
-      selectedSwitch = widget.switches.isNotEmpty ? widget.switches.first : null;
+      selectedSwitch = widget.switches.isNotEmpty
+          ? widget.switches.first
+          : null;
     }
 
     bool turnOn = true;
@@ -129,7 +151,7 @@ class _TimerScreenState extends State<TimerScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<TimerType>(
-                  value: timerType,
+                  initialValue: timerType,
                   decoration: const InputDecoration(labelText: 'Timer Type'),
                   items: TimerType.values
                       .map(
@@ -149,7 +171,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   }),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // --- SCHEDULED UI ---
                 if (timerType == TimerType.scheduled) ...[
                   ListTile(
@@ -169,7 +191,7 @@ class _TimerScreenState extends State<TimerScreen> {
                             }
                           },
                         );
-                      }
+                      },
                     ),
                   ),
                   const Divider(),
@@ -192,7 +214,7 @@ class _TimerScreenState extends State<TimerScreen> {
                         )
                         .toList(),
                   ),
-                ] 
+                ]
                 // --- PRESCHEDULED UI ---
                 else if (timerType == TimerType.prescheduled) ...[
                   ListTile(
@@ -208,7 +230,8 @@ class _TimerScreenState extends State<TimerScreen> {
                           onPressed: () async {
                             final DateTime? date = await showDatePicker(
                               context: innerContext,
-                              initialDate: scheduledDate ??
+                              initialDate:
+                                  scheduledDate ??
                                   DateTime.now().add(const Duration(days: 1)),
                               firstDate: DateTime.now(),
                               lastDate: DateTime.now().add(
@@ -219,7 +242,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               setState(() => scheduledDate = date);
                               // ignore: use_build_context_synchronously
                               if (!innerContext.mounted) return;
-                              
+
                               final TimeOfDay? time = await showTimePicker(
                                 context: innerContext,
                                 initialTime: selectedTime,
@@ -230,10 +253,10 @@ class _TimerScreenState extends State<TimerScreen> {
                             }
                           },
                         );
-                      }
+                      },
                     ),
                   ),
-                ] 
+                ]
                 // --- COUNTDOWN UI ---
                 else if (timerType == TimerType.countdown) ...[
                   ListTile(
@@ -265,8 +288,11 @@ class _TimerScreenState extends State<TimerScreen> {
                 ),
                 const Divider(),
                 const Text('Select Switch:'),
-                if(widget.switches.isEmpty)
-                   const Text("No switches found", style: TextStyle(color: Colors.red)),
+                if (widget.switches.isEmpty)
+                  const Text(
+                    "No switches found",
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ...widget.switches.map(
                   (switch_) => RadioListTile<SwitchDevice>(
                     title: Text(switch_.name),
@@ -297,10 +323,12 @@ class _TimerScreenState extends State<TimerScreen> {
                   ? null
                   : () async {
                       try {
-                        if (timerType == TimerType.prescheduled && scheduledDate == null) {
+                        if (timerType == TimerType.prescheduled &&
+                            scheduledDate == null) {
                           throw Exception('Scheduled date is required');
                         }
-                        if (timerType == TimerType.scheduled && selectedDays.isEmpty) {
+                        if (timerType == TimerType.scheduled &&
+                            selectedDays.isEmpty) {
                           throw Exception('At least one day must be selected');
                         }
 
@@ -308,12 +336,15 @@ class _TimerScreenState extends State<TimerScreen> {
                         if (timerType == TimerType.countdown) {
                           timeStr = countdownMinutes.toString();
                         } else {
-                          timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+                          timeStr =
+                              '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
                         }
 
                         List<int> dbDaysOfWeek = [];
                         if (timerType == TimerType.scheduled) {
-                          dbDaysOfWeek = selectedDays.map((d) => _dayToInt(d)).toList();
+                          dbDaysOfWeek = selectedDays
+                              .map((d) => _dayToInt(d))
+                              .toList();
                         }
 
                         final timerData = {
@@ -335,15 +366,19 @@ class _TimerScreenState extends State<TimerScreen> {
                                   selectedTime.minute,
                                 ).toUtc().toIso8601String()
                               : null,
-                          'created_at': DateTime.now().toUtc().toIso8601String(),
-                          'updated_at': DateTime.now().toUtc().toIso8601String(),
+                          'created_at': DateTime.now()
+                              .toUtc()
+                              .toIso8601String(),
+                          'updated_at': DateTime.now()
+                              .toUtc()
+                              .toIso8601String(),
                         };
 
                         await _supabase.from('hc_timers').insert(timerData);
 
                         // ✅ FIX 2: Check mounted before using context
-                        if (!context.mounted) return; 
-                        
+                        if (!context.mounted) return;
+
                         Navigator.pop(context);
                         _loadTimers();
                         _showMessage('Timer created successfully!');
@@ -362,8 +397,8 @@ class _TimerScreenState extends State<TimerScreen> {
   }
 
   Future<void> _toggleTimer(SwitchTimer timer) async {
-    final newState = !timer.isActive; 
-    
+    final newState = !timer.isActive;
+
     try {
       await _supabase
           .from('hc_timers')
@@ -372,8 +407,8 @@ class _TimerScreenState extends State<TimerScreen> {
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', timer.id);
-      
-      _loadTimers(); 
+
+      _loadTimers();
     } catch (e) {
       _showError('Error updating timer: ${e.toString()}');
     }
@@ -425,11 +460,11 @@ class _TimerScreenState extends State<TimerScreen> {
 
   String _formatTimerSubtitle(SwitchTimer timer) {
     final action = timer.action ? 'Turn ON' : 'Turn OFF';
-    
+
     List<String> activeDays = [];
-    for(int i=0; i<7; i++) {
+    for (int i = 0; i < 7; i++) {
       if (timer.repeatDays.length > i && timer.repeatDays[i]) {
-        activeDays.add(_intToDay(i+1));
+        activeDays.add(_intToDay(i + 1));
       }
     }
 
@@ -484,8 +519,8 @@ class _TimerScreenState extends State<TimerScreen> {
                   ),
                   child: ListTile(
                     leading: Icon(
-                      _getTimerIcon(timer.action), 
-                      color: timer.action ? Colors.green : Colors.red
+                      _getTimerIcon(timer.action),
+                      color: timer.action ? Colors.green : Colors.red,
                     ),
                     title: Text(_formatTimerTitle(timer)),
                     subtitle: Text(_formatTimerSubtitle(timer)),
@@ -493,31 +528,34 @@ class _TimerScreenState extends State<TimerScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Switch(
-                          value: timer.isActive, 
+                          value: timer.isActive,
                           onChanged: (value) => _toggleTimer(timer),
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
                           onPressed: () {
-                             showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Delete Timer'),
-                                  content: const Text('Are you sure?'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                        _deleteTimer(timer);
-                                      }, 
-                                      child: const Text('Delete')
-                                    ),
-                                  ],
-                                )
-                             );
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Delete Timer'),
+                                content: const Text('Are you sure?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _deleteTimer(timer);
+                                    },
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
                           },
-                        )
+                        ),
                       ],
                     ),
                   ),

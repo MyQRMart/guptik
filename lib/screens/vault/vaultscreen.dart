@@ -111,9 +111,9 @@ class _VaultScreenState extends State<VaultScreen> {
         for (var item in targetList) {
           String val = "";
           if (item is Map) {
-            if (item['id'] != null)
+            if (item['id'] != null) {
               val = item['id'].toString();
-            else if (item['filename'] != null)
+            } else if (item['filename'] != null)
               val = item['filename'].toString();
             else if (item['title'] != null)
               val = item['title'].toString();
@@ -180,11 +180,12 @@ class _VaultScreenState extends State<VaultScreen> {
   Future<void> _initialLoad() async {
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
     if (!ps.isAuth) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _hasPermission = false;
           _isLoading = false;
         });
+      }
       return;
     }
 
@@ -224,8 +225,9 @@ class _VaultScreenState extends State<VaultScreen> {
   Future<void> _loadMoreAssets() async {
     if (_isLoadingMore ||
         _allAssets.length >= _totalAssetCount ||
-        _currentAlbum == null)
+        _currentAlbum == null) {
       return;
+    }
 
     setState(() => _isLoadingMore = true);
     _currentPage++;
@@ -269,12 +271,14 @@ class _VaultScreenState extends State<VaultScreen> {
       final syncService = VaultSyncService();
       String? dynamicUrl = await syncService.getDesktopUrl();
 
-      if (dynamicUrl == null || dynamicUrl.isEmpty)
+      if (dynamicUrl == null || dynamicUrl.isEmpty) {
         throw Exception("No Desktop Found.");
+      }
       if (!dynamicUrl.startsWith('http')) dynamicUrl = 'https://$dynamicUrl';
 
-      if (!await syncService.isGatewayOnline(dynamicUrl))
+      if (!await syncService.isGatewayOnline(dynamicUrl)) {
         throw Exception("Desktop Offline.");
+      }
 
       // STEP 1: Ask desktop exactly what it has.
       Set<String> currentlyOnDesktop = await _fetchActualDesktopFiles();
@@ -455,8 +459,9 @@ class _VaultScreenState extends State<VaultScreen> {
 
             // Update File Counters Live
             _liveSyncedNotifier.value++;
-            if (_liveRemainingNotifier.value > 0)
+            if (_liveRemainingNotifier.value > 0) {
               _liveRemainingNotifier.value--;
+            }
 
             await Future.delayed(const Duration(milliseconds: 10));
           }
@@ -770,8 +775,9 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
             : FutureBuilder<Uint8List?>(
                 future: widget.asset.originBytes,
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData)
+                  if (!snapshot.hasData) {
                     return const CircularProgressIndicator(color: Colors.white);
+                  }
                   return InteractiveViewer(
                     child: Image.memory(snapshot.data!, fit: BoxFit.contain),
                   );
@@ -819,8 +825,9 @@ class _VideoPlayerItemState extends State<_VideoPlayerItem> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_initialized || _controller == null)
+    if (!_initialized || _controller == null) {
       return const CircularProgressIndicator(color: Colors.white);
+    }
     return GestureDetector(
       onTap: () {
         setState(

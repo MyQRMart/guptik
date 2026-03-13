@@ -10,12 +10,12 @@ class SwitchControlTile extends StatelessWidget {
   final Function(String) onNameChanged;
 
   const SwitchControlTile({
-    Key? key,
+    super.key,
     required this.device,
     required this.onToggle,
     required this.onTypeChanged,
     required this.onNameChanged,
-  }) : super(key: key);
+  });
 
   Future<void> _showNameEditDialog(BuildContext context) async {
     final TextEditingController nameController = TextEditingController(

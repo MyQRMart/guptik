@@ -1,11 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/models/facebook/meta_content_model.dart';
 
 class AutoReplyDialog extends StatefulWidget {
   final String postId;
+  final SocialPlatform platform;
 
-  const AutoReplyDialog({super.key, required this.postId});
+  const AutoReplyDialog({
+    super.key,
+    required this.postId,
+    required this.platform,
+  });
 
   @override
   State<AutoReplyDialog> createState() => _AutoReplyDialogState();
@@ -35,11 +41,24 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
   @override
   void initState() {
     super.initState();
+    debugPrint('🔍 AutoReplyDialog - Platform received: ${widget.platform}');
     _loadAllData();
   }
 
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
+
+    // Determine table name based on platform
+    final String configTableName = widget.platform == SocialPlatform.instagram
+        ? 'ig_auto_comment_posts'
+        : 'fb_auto_comment_posts';
+    final String commentsTableName = widget.platform == SocialPlatform.instagram
+        ? 'ig_comments_responces'
+        : 'fb_comments_responces';
+
+    debugPrint(
+      '📊 Using Table: $configTableName for platform ${widget.platform}',
+    );
 
     // 1. Fetch AI Agents
     try {
@@ -56,7 +75,7 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
     // 2. Fetch Existing Post Config
     try {
       final response = await Supabase.instance.client
-          .from('ig_auto_comment_posts')
+          .from(configTableName)
           .select()
           .eq('post_id', widget.postId)
           .maybeSingle();
@@ -91,7 +110,7 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
             : 'M';
 
         if (_allComments) {
-          _fetchCommentsForPost();
+          _fetchCommentsForPost(commentsTableName);
         }
       }
     } catch (e) {
@@ -101,11 +120,11 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
     }
   }
 
-  Future<void> _fetchCommentsForPost() async {
+  Future<void> _fetchCommentsForPost(String commentsTableName) async {
     setState(() => _isLoadingComments = true);
     try {
       final commentsResponse = await Supabase.instance.client
-          .from('ig_comments_responces')
+          .from(commentsTableName)
           .select('sender_name, context, direction')
           .eq('post_id', widget.postId)
           .order('created_at', ascending: false);
@@ -129,10 +148,19 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
       return;
     }
 
+    // Determine table name based on platform
+    final String configTableName = widget.platform == SocialPlatform.instagram
+        ? 'ig_auto_comment_posts'
+        : 'fb_auto_comment_posts';
+
+    debugPrint(
+      '💾 Saving to table: $configTableName (platform: ${widget.platform})',
+    );
+
     try {
       if (_autoCommentStatus == 'X') {
         await Supabase.instance.client
-            .from('ig_auto_comment_posts')
+            .from(configTableName)
             .delete()
             .eq('post_id', widget.postId);
       } else {
@@ -141,7 +169,7 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
           "respond": _dmResponseController.text.trim(),
         };
 
-        await Supabase.instance.client.from('ig_auto_comment_posts').upsert({
+        await Supabase.instance.client.from(configTableName).upsert({
           'user_id': userId,
           'post_id': widget.postId,
           'auto_reply': autoReplyJson,
@@ -196,7 +224,7 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 4,
                     ),
                   ]
@@ -232,12 +260,13 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
         .firstOrNull;
     String detailTextToShow = "";
     if (selectedAgent != null) {
-      if (_selectedAgentTab == 'Name')
+      if (_selectedAgentTab == 'Name') {
         detailTextToShow = "Name: ${selectedAgent['name'] ?? 'N/A'}";
-      else if (_selectedAgentTab == 'Model')
+      } else if (_selectedAgentTab == 'Model') {
         detailTextToShow = "Model: ${selectedAgent['model'] ?? 'N/A'}";
-      else if (_selectedAgentTab == 'Prompt')
+      } else if (_selectedAgentTab == 'Prompt') {
         detailTextToShow = "Prompt: ${selectedAgent['system_prompt'] ?? 'N/A'}";
+      }
     }
 
     return AlertDialog(
@@ -294,10 +323,16 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
                 ),
                 Switch(
                   value: _allComments,
-                  activeColor: const Color(0xFF1877F2),
+                  activeThumbColor: const Color(0xFF1877F2),
                   onChanged: (val) {
                     setState(() => _allComments = val);
-                    if (val && _postComments.isEmpty) _fetchCommentsForPost();
+                    if (val && _postComments.isEmpty) {
+                      _fetchCommentsForPost(
+                        widget.platform == SocialPlatform.instagram
+                            ? 'ig_comments_responces'
+                            : 'fb_comments_responces',
+                      );
+                    }
                   },
                 ),
               ],
@@ -360,7 +395,7 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
                   labelText: "AI Agent ID",
                   border: OutlineInputBorder(),
                 ),
-                value: _selectedAiAgentId,
+                initialValue: _selectedAiAgentId,
                 items: _aiAgents
                     .map(
                       (agent) => DropdownMenuItem<String>(
@@ -388,7 +423,9 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.blueGrey.shade100.withOpacity(0.5),
+                          color: Colors.blueGrey.shade100.withValues(
+                            alpha: 0.5,
+                          ),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(

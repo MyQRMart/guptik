@@ -4,7 +4,6 @@ import 'package:guptik/models/whatsapp/wa_template_group.dart';
 import 'package:guptik/services/whatsapp/wa_template_WhatsAppApiService.dart';
 import 'package:guptik/services/whatsapp/wa_template_service.dart';
 import 'group_form_screen.dart';
-import 'send_template.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final WATemplateGroup group;

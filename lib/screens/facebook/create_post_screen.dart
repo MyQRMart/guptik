@@ -14,11 +14,28 @@ class CreatePostScreen extends StatefulWidget {
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final MetaService _metaService = MetaService();
   final ImagePicker _picker = ImagePicker();
-  
+
   File? _selectedImage;
   final TextEditingController _captionController = TextEditingController();
   SocialPlatform _selectedPlatform = SocialPlatform.facebook;
   bool _isUploading = false;
+
+  bool get _canPost => _captionController.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to caption text changes to update button state
+    _captionController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _captionController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -30,9 +47,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _handlePost() async {
-    if (_selectedImage == null) {
+    if (_captionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Please enter a caption.")));
+      return;
+    }
+
+    // Instagram requires an image
+    if (_selectedPlatform == SocialPlatform.instagram &&
+        _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select an image first.")),
+        const SnackBar(content: Text("Instagram posts require an image.")),
       );
       return;
     }
@@ -41,21 +67,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     // Call the Service
     bool success = await _metaService.uploadPost(
-      _selectedPlatform, 
-      _selectedImage!, 
-      _captionController.text
+      _selectedPlatform,
+      _selectedImage,
+      _captionController.text,
     );
 
     if (mounted) {
       setState(() => _isUploading = false);
       if (success) {
         Navigator.pop(context); // Close screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Posted successfully!")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Posted successfully!")));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Upload failed. Check console for details.")),
+          const SnackBar(
+            content: Text("Upload failed. Check console for details."),
+          ),
         );
       }
     }
@@ -64,18 +92,60 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Create New Post", style: TextStyle(color: Colors.black)),
+        title: Text(
+          "Create New Post",
+          style: TextStyle(
+            color: Colors.grey[900],
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            letterSpacing: 0.3,
+          ),
+        ),
         backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        elevation: 2,
+        shadowColor: Colors.grey.withValues(alpha: 0.1),
+        iconTheme: IconThemeData(color: Colors.grey[800]),
         actions: [
-          TextButton(
-            onPressed: (_selectedImage != null && !_isUploading) ? _handlePost : null,
-            child: _isUploading 
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
-              : const Text("Post", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)),
-          )
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: TextButton(
+              onPressed: (_canPost && !_isUploading) ? _handlePost : null,
+              style: TextButton.styleFrom(
+                backgroundColor: (_canPost && !_isUploading)
+                    ? const Color(0xFF1877F2)
+                    : Colors.grey[300],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 10,
+                ),
+              ),
+              child: _isUploading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      "Post",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: (_canPost && !_isUploading)
+                            ? Colors.white
+                            : Colors.grey[600],
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+            ),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -86,22 +156,37 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             // Platform Selector
             Row(
               children: [
-                const Text("Post to: ", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text(
+                  "Post to: ",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 const SizedBox(width: 10),
                 ChoiceChip(
                   label: const Text("Facebook"),
                   selected: _selectedPlatform == SocialPlatform.facebook,
-                  onSelected: (val) => setState(() => _selectedPlatform = SocialPlatform.facebook),
+                  onSelected: (val) => setState(
+                    () => _selectedPlatform = SocialPlatform.facebook,
+                  ),
                   selectedColor: Colors.blue.withValues(alpha: 0.2),
-                  labelStyle: TextStyle(color: _selectedPlatform == SocialPlatform.facebook ? Colors.blue : Colors.black),
+                  labelStyle: TextStyle(
+                    color: _selectedPlatform == SocialPlatform.facebook
+                        ? Colors.blue
+                        : Colors.black,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 ChoiceChip(
                   label: const Text("Instagram"),
                   selected: _selectedPlatform == SocialPlatform.instagram,
-                  onSelected: (val) => setState(() => _selectedPlatform = SocialPlatform.instagram),
+                  onSelected: (val) => setState(
+                    () => _selectedPlatform = SocialPlatform.instagram,
+                  ),
                   selectedColor: Colors.pink.withValues(alpha: 0.2),
-                  labelStyle: TextStyle(color: _selectedPlatform == SocialPlatform.instagram ? Colors.pink : Colors.black),
+                  labelStyle: TextStyle(
+                    color: _selectedPlatform == SocialPlatform.instagram
+                        ? Colors.pink
+                        : Colors.black,
+                  ),
                 ),
               ],
             ),
@@ -113,14 +198,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               maxLines: 4,
               decoration: InputDecoration(
                 hintText: "What's on your mind?",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 filled: true,
                 fillColor: Colors.grey[50],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Image Picker Area
+            // Image Picker Area (Optional)
             GestureDetector(
               onTap: _pickImage,
               child: Container(
@@ -137,7 +224,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                            child: Image.file(
+                              _selectedImage!,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                           Positioned(
                             top: 8,
@@ -145,11 +235,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             child: CircleAvatar(
                               backgroundColor: Colors.black54,
                               child: IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.white),
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.white,
+                                ),
                                 onPressed: _pickImage,
                               ),
                             ),
-                          )
+                          ),
                         ],
                       )
                     : const Column(
@@ -157,7 +250,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         children: [
                           Icon(Icons.add_a_photo, size: 50, color: Colors.grey),
                           SizedBox(height: 10),
-                          Text("Add Photo", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                          Text(
+                            "Add Photo (Optional)",
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
                         ],
                       ),
               ),

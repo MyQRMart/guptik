@@ -7,10 +7,10 @@ class LightningEffectsWidget extends StatefulWidget {
   final bool isThunderstorm;
 
   const LightningEffectsWidget({
-    Key? key,
+    super.key,
     required this.child,
     this.isThunderstorm = true,
-  }) : super(key: key);
+  });
 
   @override
   State<LightningEffectsWidget> createState() => _LightningEffectsWidgetState();

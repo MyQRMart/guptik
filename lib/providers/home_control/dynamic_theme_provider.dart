@@ -97,8 +97,9 @@ class DynamicThemeProvider extends ChangeNotifier {
   }
 
   Future<void> _setupLocationPermissions() async {
-    if (_themeSettings.themeType != theme_models.ThemeType.dynamicWeather)
+    if (_themeSettings.themeType != theme_models.ThemeType.dynamicWeather) {
       return;
+    }
 
     try {
       final status = await Permission.location.request();

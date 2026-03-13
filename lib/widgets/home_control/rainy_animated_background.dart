@@ -42,10 +42,10 @@ class RainyAnimatedBackground extends StatefulWidget {
   final bool isThunderstorm; // true for thunderstorm, false for regular rain
 
   const RainyAnimatedBackground({
-    Key? key,
+    super.key,
     required this.child,
     this.isThunderstorm = false,
-  }) : super(key: key);
+  });
 
   @override
   State<RainyAnimatedBackground> createState() =>
@@ -410,8 +410,9 @@ class LightningPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (animationValue < 0.1 || animationValue > 0.4)
+    if (animationValue < 0.1 || animationValue > 0.4) {
       return; // Only show during flash
+    }
 
     final lightningPaint = Paint()
       ..style = PaintingStyle.stroke

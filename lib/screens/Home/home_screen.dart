@@ -3213,8 +3213,10 @@ class _InboxContentWidgetState extends State<InboxContentWidget> {
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty || selectedConversation == null)
+    if (_messageController.text.trim().isEmpty ||
+        selectedConversation == null) {
       return;
+    }
 
     final messageText = _messageController.text.trim();
     _messageController.clear();

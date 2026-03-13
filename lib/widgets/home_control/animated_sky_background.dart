@@ -94,10 +94,10 @@ class AnimatedSkyBackground extends StatefulWidget {
   final bool isDarkMode;
 
   const AnimatedSkyBackground({
-    Key? key,
+    super.key,
     required this.child,
     required this.isDarkMode,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedSkyBackground> createState() => _AnimatedSkyBackgroundState();

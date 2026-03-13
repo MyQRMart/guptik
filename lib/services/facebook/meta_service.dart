@@ -17,7 +17,7 @@ class MetaService {
   Future<Map<String, dynamic>> _getCredentials() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) throw Exception("User not logged in to App");
-    
+
     if (_cachedCredentials != null) return _cachedCredentials!;
 
     try {
@@ -36,42 +36,51 @@ class MetaService {
   // ---------------------------------------------------------------------------
   // 📸 1. GET CONTENT (Posts, Reels, Stories)
   // ---------------------------------------------------------------------------
-  Future<List<MetaContent>> getContent(SocialPlatform platform, ContentType filter) async {
+  Future<List<MetaContent>> getContent(
+    SocialPlatform platform,
+    ContentType filter,
+  ) async {
     final creds = await _getCredentials();
-    final String? accessToken = creds['facebook_page_access_token'] ?? creds['facebook_user_access_token'];
-    
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
     if (accessToken == null) return [];
 
     String url = '';
-    
+
     // --- A. INSTAGRAM LOGIC ---
     if (platform == SocialPlatform.instagram) {
       final String? igId = creds['instagram_account_id'];
       if (igId == null) return [];
 
       if (filter == ContentType.story) {
-        url = 'https://graph.facebook.com/$_graphApiVersion/$igId/stories?fields=id,caption,media_type,media_url,thumbnail_url,like_count,comments_count&access_token=$accessToken';
+        url =
+            'https://graph.facebook.com/$_graphApiVersion/$igId/stories?fields=id,caption,media_type,media_url,thumbnail_url,like_count,comments_count&access_token=$accessToken';
       } else if (filter == ContentType.mention) {
-        url = 'https://graph.facebook.com/$_graphApiVersion/$igId/tags?fields=id,caption,media_type,media_url,thumbnail_url,like_count,comments_count&access_token=$accessToken';
+        url =
+            'https://graph.facebook.com/$_graphApiVersion/$igId/tags?fields=id,caption,media_type,media_url,thumbnail_url,like_count,comments_count&access_token=$accessToken';
       } else {
-        url = 'https://graph.facebook.com/$_graphApiVersion/$igId/media?fields=id,caption,media_type,media_product_type,media_url,thumbnail_url,like_count,comments_count&access_token=$accessToken';
+        url =
+            'https://graph.facebook.com/$_graphApiVersion/$igId/media?fields=id,caption,media_type,media_product_type,media_url,thumbnail_url,like_count,comments_count&access_token=$accessToken';
       }
-    } 
+    }
     // --- B. FACEBOOK LOGIC ---
     else {
       final String? pageId = creds['facebook_account_id'];
       if (pageId == null) return [];
 
       if (filter == ContentType.story) {
-        return []; 
+        return [];
       } else {
-        url = 'https://graph.facebook.com/$_graphApiVersion/$pageId/feed?fields=id,message,full_picture,likes.summary(true),comments.summary(true),created_time&access_token=$accessToken';
+        url =
+            'https://graph.facebook.com/$_graphApiVersion/$pageId/feed?fields=id,message,full_picture,likes.summary(true),comments.summary(true),created_time&access_token=$accessToken';
       }
     }
 
     try {
       final response = await http.get(Uri.parse(url));
-      
+
       if (response.statusCode != 200) {
         debugPrint("API Error: ${response.body}");
         return [];
@@ -94,33 +103,40 @@ class MetaService {
           } else if (item['media_product_type'] == 'REELS') {
             itemType = ContentType.reel;
           }
-          
+
           String img = item['media_url'] ?? '';
           if (item['media_type'] == 'VIDEO' && item['thumbnail_url'] != null) {
             img = item['thumbnail_url'];
           }
 
           if (filter == itemType) {
-            results.add(MetaContent(
-              id: item['id'],
-              platform: platform,
-              type: itemType,
-              imageUrl: img,
-              caption: item['caption'] ?? '',
-              likes: item['like_count'] ?? 0,
-              comments: item['comments_count'] ?? 0,
-            ));
+            results.add(
+              MetaContent(
+                id: item['id'],
+                platform: platform,
+                type: itemType,
+                imageUrl: img,
+                caption: item['caption'] ?? '',
+                likes: item['like_count'] ?? 0,
+                comments: item['comments_count'] ?? 0,
+              ),
+            );
           }
         } else {
-          results.add(MetaContent(
-            id: item['id'],
-            platform: platform,
-            type: ContentType.post,
-            imageUrl: item['full_picture'] ?? 'https://via.placeholder.com/150',
-            caption: item['message'] ?? '',
-            likes: item['likes']?['summary']?['total_count'] ?? 0,
-            comments: item['comments']?['summary']?['total_count'] ?? 0,
-          ));
+          debugPrint(
+            '✅ Creating Facebook MetaContent with platform: $platform',
+          );
+          results.add(
+            MetaContent(
+              id: item['id'],
+              platform: platform,
+              type: ContentType.post,
+              imageUrl: item['full_picture'],
+              caption: item['message'] ?? '',
+              likes: item['likes']?['summary']?['total_count'] ?? 0,
+              comments: item['comments']?['summary']?['total_count'] ?? 0,
+            ),
+          );
         }
       }
       return results;
@@ -133,10 +149,16 @@ class MetaService {
   // ---------------------------------------------------------------------------
   // 🚀 2. UPLOAD POST (THE REAL BUCKET METHOD)
   // ---------------------------------------------------------------------------
-  Future<bool> uploadPost(SocialPlatform platform, File imageFile, String caption) async {
+  Future<bool> uploadPost(
+    SocialPlatform platform,
+    File? imageFile,
+    String caption,
+  ) async {
     final creds = await _getCredentials();
-    final String? accessToken = creds['facebook_page_access_token'] ?? creds['facebook_user_access_token'];
-    
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
     if (accessToken == null) return false;
 
     // --- A. FACEBOOK UPLOAD ---
@@ -144,72 +166,134 @@ class MetaService {
       final String? pageId = creds['facebook_account_id'];
       if (pageId == null) return false;
 
-      var uri = Uri.parse('https://graph.facebook.com/$_graphApiVersion/$pageId/photos');
+      // If no image, post as text-only using /feed endpoint
+      if (imageFile == null) {
+        final uri = Uri.parse(
+          'https://graph.facebook.com/$_graphApiVersion/$pageId/feed?message=${Uri.encodeComponent(caption)}&access_token=$accessToken',
+        );
+        try {
+          debugPrint("📤 FB Text-only Post URL: $uri");
+          final response = await http.post(uri);
+          debugPrint("📨 FB Response Status: ${response.statusCode}");
+          debugPrint("📨 FB Response Body: ${response.body}");
+
+          if (response.statusCode == 200) {
+            debugPrint("✅ FB Text-only Post Success: ${response.body}");
+            return true;
+          } else {
+            debugPrint(
+              "❌ FB Feed Error (${response.statusCode}): ${response.body}",
+            );
+            return false;
+          }
+        } catch (e) {
+          debugPrint("❌ FB Text-only Upload Error: $e");
+          return false;
+        }
+      }
+
+      // If image exists, post with image using /photos endpoint
+      var uri = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$pageId/photos',
+      );
       var request = http.MultipartRequest('POST', uri);
-      
+
       request.fields['access_token'] = accessToken;
       request.fields['message'] = caption;
-      request.files.add(await http.MultipartFile.fromPath('source', imageFile.path));
+      request.files.add(
+        await http.MultipartFile.fromPath('source', imageFile.path),
+      );
 
       try {
+        debugPrint("📤 FB Image Post URL: $uri");
+        debugPrint("📤 FB Image Post Fields: ${request.fields}");
         var streamedResponse = await request.send();
         var response = await http.Response.fromStream(streamedResponse);
-        return response.statusCode == 200;
+        debugPrint("📨 FB Image Response Status: ${response.statusCode}");
+        debugPrint("📨 FB Image Response Body: ${response.body}");
+
+        if (response.statusCode == 200) {
+          debugPrint("✅ FB Image Post Success: ${response.body}");
+          return true;
+        } else {
+          debugPrint(
+            "❌ FB Image Upload Error (${response.statusCode}): ${response.body}",
+          );
+          return false;
+        }
       } catch (e) {
-        debugPrint("FB Upload Error: $e");
+        debugPrint("❌ FB Image Upload Error: $e");
         return false;
       }
-    } 
-    
+    }
     // --- B. INSTAGRAM UPLOAD (Using Supabase Bucket) ---
     else {
       final String? igId = creds['instagram_account_id'];
       if (igId == null) return false;
 
+      // Instagram requires an image for posting
+      if (imageFile == null) {
+        debugPrint(
+          "IG Error: Instagram posts require an image. Text-only posts are not supported.",
+        );
+        return false;
+      }
+
       try {
         // Step 1: Upload to Supabase to get Public URL
-        final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imageFile.path)}';
-        
+        final String fileName =
+            '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imageFile.path)}';
+
         // Read file as Bytes to avoid file system errors
         final bytes = await imageFile.readAsBytes();
-        
-        // Upload to 'post_images' bucket
-        await Supabase.instance.client.storage.from('post_images').uploadBinary(
-          fileName,
-          bytes,
-          fileOptions: const FileOptions(
-            contentType: 'image/jpeg', // Force JPEG content type
-            upsert: true,
-          ),
-        );
 
-        final String publicUrl = Supabase.instance.client.storage.from('post_images').getPublicUrl(fileName);
+        // Upload to 'post_images' bucket
+        await Supabase.instance.client.storage
+            .from('post_images')
+            .uploadBinary(
+              fileName,
+              bytes,
+              fileOptions: const FileOptions(
+                contentType: 'image/jpeg', // Force JPEG content type
+                upsert: true,
+              ),
+            );
+
+        final String publicUrl = Supabase.instance.client.storage
+            .from('post_images')
+            .getPublicUrl(fileName);
         debugPrint("Image Uploaded to Supabase: $publicUrl");
 
         // Step 2: Create Media Container
-        final containerUrl = Uri.parse('https://graph.facebook.com/$_graphApiVersion/$igId/media');
-        final containerResponse = await http.post(containerUrl, body: {
-          'image_url': publicUrl,
-          'caption': caption,
-          'access_token': accessToken,
-        });
+        final containerUrl = Uri.parse(
+          'https://graph.facebook.com/$_graphApiVersion/$igId/media',
+        );
+        final containerResponse = await http.post(
+          containerUrl,
+          body: {
+            'image_url': publicUrl,
+            'caption': caption,
+            'access_token': accessToken,
+          },
+        );
 
         if (containerResponse.statusCode != 200) {
-           debugPrint("IG Container Error: ${containerResponse.body}");
-           return false;
+          debugPrint("IG Container Error: ${containerResponse.body}");
+          return false;
         }
 
         final String creationId = json.decode(containerResponse.body)['id'];
 
         // Step 3: Publish Container
-        final publishUrl = Uri.parse('https://graph.facebook.com/$_graphApiVersion/$igId/media_publish');
-        final publishResponse = await http.post(publishUrl, body: {
-          'creation_id': creationId,
-          'access_token': accessToken,
-        });
+        final publishUrl = Uri.parse(
+          'https://graph.facebook.com/$_graphApiVersion/$igId/media_publish',
+        );
+        final publishResponse = await http.post(
+          publishUrl,
+          body: {'creation_id': creationId, 'access_token': accessToken},
+        );
 
         return publishResponse.statusCode == 200;
-
       } catch (e) {
         debugPrint("IG Upload Error: $e");
         return false;
@@ -224,7 +308,9 @@ class MetaService {
     final creds = await _getCredentials();
     final String? fbPageId = creds['facebook_account_id'];
     final String? igAccountId = creds['instagram_account_id'];
-    final String? accessToken = creds['facebook_page_access_token'] ?? creds['facebook_user_access_token'];
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
 
     if (accessToken == null) return [];
 
@@ -233,7 +319,8 @@ class MetaService {
     // Fetch FB
     if (fbPageId != null) {
       final fbUrl = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$fbPageId/conversations?fields=id,updated_time,messages.limit(1){message,from,created_time},unread_count&access_token=$accessToken');
+        'https://graph.facebook.com/$_graphApiVersion/$fbPageId/conversations?fields=id,updated_time,messages.limit(1){message,from,created_time},unread_count&access_token=$accessToken',
+      );
       try {
         final fbResponse = await http.get(fbUrl);
         if (fbResponse.statusCode == 200) {
@@ -241,17 +328,22 @@ class MetaService {
           if (fbData.containsKey('data')) {
             final List<dynamic> fbConvos = fbData['data'];
             for (var conv in fbConvos) {
-              allChats.add(_mapConversationToChat(conv, SocialPlatform.facebook));
+              allChats.add(
+                _mapConversationToChat(conv, SocialPlatform.facebook),
+              );
             }
           }
         }
-      } catch (e) { debugPrint("FB Inbox Error: $e"); }
+      } catch (e) {
+        debugPrint("FB Inbox Error: $e");
+      }
     }
 
     // Fetch IG
     if (igAccountId != null) {
       final igUrl = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$igAccountId/conversations?platform=instagram&fields=id,updated_time,messages.limit(1){message,from,created_time},unread_count&access_token=$accessToken');
+        'https://graph.facebook.com/$_graphApiVersion/$igAccountId/conversations?platform=instagram&fields=id,updated_time,messages.limit(1){message,from,created_time},unread_count&access_token=$accessToken',
+      );
       try {
         final igResponse = await http.get(igUrl);
         if (igResponse.statusCode == 200) {
@@ -259,11 +351,15 @@ class MetaService {
           if (igData.containsKey('data')) {
             final List<dynamic> igConvos = igData['data'];
             for (var conv in igConvos) {
-              allChats.add(_mapConversationToChat(conv, SocialPlatform.instagram));
+              allChats.add(
+                _mapConversationToChat(conv, SocialPlatform.instagram),
+              );
             }
           }
         }
-      } catch (e) { debugPrint("IG Inbox Error: $e"); }
+      } catch (e) {
+        debugPrint("IG Inbox Error: $e");
+      }
     }
 
     allChats.sort((a, b) {
@@ -271,7 +367,7 @@ class MetaService {
       DateTime? timeB = _parseIsoTime(b.rawTimestamp);
       if (timeA == null) return 1;
       if (timeB == null) return -1;
-      return timeB.compareTo(timeA); 
+      return timeB.compareTo(timeA);
     });
 
     return allChats;
@@ -280,25 +376,30 @@ class MetaService {
   // ---------------------------------------------------------------------------
   // 🗨️ 4. GET SPECIFIC CHAT MESSAGES
   // ---------------------------------------------------------------------------
-  Future<List<Map<String, dynamic>>> getChatMessages(String conversationId) async {
+  Future<List<Map<String, dynamic>>> getChatMessages(
+    String conversationId,
+  ) async {
     final creds = await _getCredentials();
-    final String? accessToken = creds['facebook_page_access_token'] ?? creds['facebook_user_access_token'];
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
 
     if (accessToken == null) return [];
 
     final url = Uri.parse(
-        'https://graph.facebook.com/$_graphApiVersion/$conversationId/messages?fields=message,from,created_time&limit=20&access_token=$accessToken');
+      'https://graph.facebook.com/$_graphApiVersion/$conversationId/messages?fields=message,from,created_time&limit=20&access_token=$accessToken',
+    );
 
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> rawMsgs = data['data'];
-        
+
         return rawMsgs.map((m) {
           return {
             'message': m['message'] ?? '',
-            'is_from_me': false, 
+            'is_from_me': false,
             'created_time': m['created_time'],
           };
         }).toList();
@@ -314,22 +415,29 @@ class MetaService {
   // ---------------------------------------------------------------------------
   Future<bool> sendMessage(String conversationId, String message) async {
     final creds = await _getCredentials();
-    final String? accessToken = creds['facebook_page_access_token'] ?? creds['facebook_user_access_token'];
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
 
     if (accessToken == null) return false;
 
-    final url = Uri.parse('https://graph.facebook.com/$_graphApiVersion/$conversationId/messages');
+    final url = Uri.parse(
+      'https://graph.facebook.com/$_graphApiVersion/$conversationId/messages',
+    );
 
     try {
-      final response = await http.post(url, body: {
-        'recipient': json.encode({'id': conversationId}), 
-        'message': message, 
-        'access_token': accessToken,
-      });
+      final response = await http.post(
+        url,
+        body: {
+          'recipient': json.encode({'id': conversationId}),
+          'message': message,
+          'access_token': accessToken,
+        },
+      );
 
       if (response.statusCode != 200) {
-         debugPrint("Send Error: ${response.body}");
-         return false;
+        debugPrint("Send Error: ${response.body}");
+        return false;
       }
       return true;
     } catch (e) {
@@ -344,18 +452,21 @@ class MetaService {
   MetaChat _mapConversationToChat(dynamic conv, SocialPlatform platform) {
     final lastMsgData = conv['messages']?['data']?[0];
     final String messageText = lastMsgData?['message'] ?? 'Attachment sent';
-    final String senderName = lastMsgData?['from']?['username'] ?? lastMsgData?['from']?['name'] ?? 'User';
+    final String senderName =
+        lastMsgData?['from']?['username'] ??
+        lastMsgData?['from']?['name'] ??
+        'User';
     final String rawTime = lastMsgData?['created_time'];
     final String displayTime = _formatTime(rawTime);
-    
+
     return MetaChat(
       id: conv['id'],
       senderName: senderName,
       lastMessage: messageText,
       time: displayTime,
       rawTimestamp: rawTime,
-      avatarUrl: '', 
-      platform: platform, 
+      avatarUrl: '',
+      platform: platform,
       isUnread: (conv['unread_count'] ?? 0) > 0,
     );
   }

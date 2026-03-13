@@ -59,11 +59,11 @@ class SnowAnimationWidget extends StatefulWidget {
   final int particleCount;
 
   const SnowAnimationWidget({
-    Key? key,
+    super.key,
     required this.child,
     this.isSnowing = true,
     this.particleCount = 50,
-  }) : super(key: key);
+  });
 
   @override
   State<SnowAnimationWidget> createState() => _SnowAnimationWidgetState();

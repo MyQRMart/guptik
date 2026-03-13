@@ -15,7 +15,7 @@ class GlassCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   const GlassCard({
-    Key? key,
+    super.key,
     required this.child,
     this.width,
     this.height,
@@ -27,7 +27,7 @@ class GlassCard extends StatelessWidget {
     this.borderColor,
     this.customShadows,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +107,7 @@ class GlassButton extends StatefulWidget {
   final bool isActive;
 
   const GlassButton({
-    Key? key,
+    super.key,
     required this.child,
     this.onPressed,
     this.width,
@@ -116,7 +116,7 @@ class GlassButton extends StatefulWidget {
     this.borderRadius = 12,
     this.gradientColors,
     this.isActive = false,
-  }) : super(key: key);
+  });
 
   @override
   State<GlassButton> createState() => _GlassButtonState();
@@ -219,14 +219,14 @@ class GlassToggleSwitch extends StatefulWidget {
   final Duration animationDuration;
 
   const GlassToggleSwitch({
-    Key? key,
+    super.key,
     required this.value,
     this.onChanged,
     this.width = 60,
     this.height = 30,
     this.activeColors,
     this.animationDuration = const Duration(milliseconds: 300),
-  }) : super(key: key);
+  });
 
   @override
   State<GlassToggleSwitch> createState() => _GlassToggleSwitchState();
@@ -375,11 +375,11 @@ class GradientBackground extends StatelessWidget {
   final bool useTimeBasedColors;
 
   const GradientBackground({
-    Key? key,
+    super.key,
     required this.child,
     this.colors,
     this.useTimeBasedColors = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

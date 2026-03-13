@@ -26,9 +26,10 @@ class CustomSwitch extends StatelessWidget {
         child: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: activeColor ?? Theme.of(context).colorScheme.primary,
-          thumbIcon: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          activeThumbColor:
+              activeColor ?? Theme.of(context).colorScheme.primary,
+          thumbIcon: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
               return const Icon(Icons.power_settings_new, size: 16);
             }
             return const Icon(Icons.power_settings_new_outlined, size: 16);

@@ -36,8 +36,9 @@ class MetaApiService {
       headers: {'Authorization': 'Bearer $accessToken'},
     );
 
-    if (sessionRes.statusCode != 200)
+    if (sessionRes.statusCode != 200) {
       throw Exception('Session Error: ${sessionRes.body}');
+    }
 
     final sessionData = json.decode(sessionRes.body);
     final String sessionId = sessionData['id'];
@@ -51,8 +52,9 @@ class MetaApiService {
       body: fileBytes,
     );
 
-    if (uploadRes.statusCode != 200)
+    if (uploadRes.statusCode != 200) {
       throw Exception('Upload Error: ${uploadRes.body}');
+    }
 
     final uploadData = json.decode(uploadRes.body);
     return uploadData['h'];
@@ -148,8 +150,9 @@ class MetaApiService {
     }
     components.add(body);
 
-    if (footerText.isNotEmpty)
+    if (footerText.isNotEmpty) {
       components.add({'type': 'FOOTER', 'text': footerText});
+    }
 
     // 4. NEW: Buttons
     if (buttons.isNotEmpty) {

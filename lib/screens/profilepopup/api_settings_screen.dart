@@ -13,12 +13,12 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _callbackUrlController = TextEditingController();
   final _verifyTokenController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _isValidating = false;
-  bool _showAccessToken = false;
+  final bool _showAccessToken = false;
   String? _metaflyApiKey;
-  
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +46,8 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
       if (response != null) {
         setState(() {
-          _callbackUrlController.text = response['callback_url'] ?? 'https://app.metafly.com/webhooks';
+          _callbackUrlController.text =
+              response['callback_url'] ?? 'https://app.metafly.com/webhooks';
           _verifyTokenController.text = response['verify_token'] ?? 'meta-fly';
           _metaflyApiKey = response['metafly_api_key'];
         });
@@ -109,9 +110,13 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
   String _generateMetaFlyApiKey() {
     // Generate a random API key similar to the format shown in the web interface
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const chars =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     final random = DateTime.now().millisecondsSinceEpoch;
-    return List.generate(26, (index) => chars[random.hashCode % chars.length]).join();
+    return List.generate(
+      26,
+      (index) => chars[random.hashCode % chars.length],
+    ).join();
   }
 
   void _copyToClipboard(String text) {
@@ -132,13 +137,14 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
     try {
       // Validate all required fields
-      if (_callbackUrlController.text.trim().isEmpty || _verifyTokenController.text.trim().isEmpty) {
+      if (_callbackUrlController.text.trim().isEmpty ||
+          _verifyTokenController.text.trim().isEmpty) {
         throw Exception('Please fill all required fields');
       }
 
       // Save the configuration first
       await _saveApiKeys();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -165,7 +171,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('API Configuration', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'API Configuration',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFF17A2B8),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
@@ -192,7 +201,11 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.api, color: const Color(0xFF17A2B8), size: 24),
+                          Icon(
+                            Icons.api,
+                            color: const Color(0xFF17A2B8),
+                            size: 24,
+                          ),
                           const SizedBox(width: 8),
                           const Text(
                             'WhatsApp Business API Setup',
@@ -207,93 +220,95 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Configure your WhatsApp Business API credentials to start sending messages through MetaFly.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                     ],
                   ),
                 ),
-              ),    
-                      const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 24),
 
-                      // Webhook Configuration Section
-                      const Divider(),
-                      const SizedBox(height: 16),
-                      
-                      Row(
-                        children: [
-                          Icon(Icons.webhook, color: const Color(0xFF17A2B8), size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Webhook Configuration',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+              // Webhook Configuration Section
+              const Divider(),
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Icon(Icons.webhook, color: const Color(0xFF17A2B8), size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Webhook Configuration',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Callback URL
+              _buildApiKeyField(
+                controller: _callbackUrlController,
+                label: 'Callback URL',
+                hint: 'https://app.metafly.com/webhooks/...',
+                icon: Icons.link,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Callback URL is required';
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // Verify Token
+              _buildApiKeyField(
+                controller: _verifyTokenController,
+                label: 'Verify Token',
+                hint: 'meta-fly',
+                icon: Icons.verified,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Verify Token is required';
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // Action Button (Validate and proceed)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: (_isLoading || _isValidating)
+                      ? null
+                      : _validateAndProceed,
+                  icon: (_isLoading || _isValidating)
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Callback URL
-                      _buildApiKeyField(
-                        controller: _callbackUrlController,
-                        label: 'Callback URL',
-                        hint: 'https://app.metafly.com/webhooks/...',
-                        icon: Icons.link,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Callback URL is required';
-                          }
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Verify Token
-                      _buildApiKeyField(
-                        controller: _verifyTokenController,
-                        label: 'Verify Token',
-                        hint: 'meta-fly',
-                        icon: Icons.verified,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Verify Token is required';
-                          }
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Action Button (Validate and proceed)
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: (_isLoading || _isValidating) ? null : _validateAndProceed,
-                          icon: (_isLoading || _isValidating)
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(Icons.check_circle),
-                          label: Text((_isLoading || _isValidating) ? 'Validating...' : 'Validate and proceed'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF17A2B8),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    
-                  
-                
-              
+                        )
+                      : const Icon(Icons.check_circle),
+                  label: Text(
+                    (_isLoading || _isValidating)
+                        ? 'Validating...'
+                        : 'Validate and proceed',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF17A2B8),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 24),
 
@@ -314,13 +329,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Use the following API key for 3rd party integrations like WordPress, Shopify, Google Sheet etc.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
@@ -345,18 +357,26 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                                 children: [
                                   Expanded(
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.grey.shade300),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                        ),
                                       ),
                                       child: Text(
-                                        _metaflyApiKey ?? 'API key will be generated after saving configuration',
+                                        _metaflyApiKey ??
+                                            'API key will be generated after saving configuration',
                                         style: TextStyle(
                                           fontFamily: 'monospace',
                                           fontSize: 12,
-                                          color: _metaflyApiKey != null ? Colors.pink : Colors.grey[500],
+                                          color: _metaflyApiKey != null
+                                              ? Colors.pink
+                                              : Colors.grey[500],
                                         ),
                                       ),
                                     ),
@@ -368,10 +388,21 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: IconButton(
-                                      icon: const Icon(Icons.copy, color: Colors.white, size: 16),
-                                      onPressed: _metaflyApiKey != null ? () => _copyToClipboard(_metaflyApiKey!) : null,
+                                      icon: const Icon(
+                                        Icons.copy,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      onPressed: _metaflyApiKey != null
+                                          ? () => _copyToClipboard(
+                                              _metaflyApiKey!,
+                                            )
+                                          : null,
                                       padding: const EdgeInsets.all(8),
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
                                       tooltip: 'Copy',
                                     ),
                                   ),
@@ -450,9 +481,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
         hintText: hint,
         prefixIcon: Icon(icon, color: const Color(0xFF17A2B8)),
         suffixIcon: suffixIcon,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF17A2B8), width: 2),

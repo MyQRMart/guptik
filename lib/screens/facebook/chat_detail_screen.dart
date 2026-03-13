@@ -27,7 +27,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     try {
       // This calls the function we are about to add to MetaService
       final msgs = await _metaService.getChatMessages(widget.conversation.id);
-      
+
       if (mounted) {
         setState(() {
           _messages = msgs;
@@ -38,7 +38,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-      debugPrint("Error loading chat details: $e"); // Fixed: print -> debugPrint
+      debugPrint(
+        "Error loading chat details: $e",
+      ); // Fixed: print -> debugPrint
     }
   }
 
@@ -51,14 +53,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             CircleAvatar(
               radius: 16,
               backgroundColor: Colors.grey[200],
-              child: Text(widget.conversation.senderName.isNotEmpty 
-                  ? widget.conversation.senderName[0] 
-                  : '?'),
+              child: Text(
+                widget.conversation.senderName.isNotEmpty
+                    ? widget.conversation.senderName[0]
+                    : '?',
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                widget.conversation.senderName, 
+                widget.conversation.senderName,
                 style: const TextStyle(fontSize: 16),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -73,42 +77,42 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         children: [
           // Messages Area
           Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator()) 
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  reverse: true, // Start from bottom
-                  itemCount: _messages.isEmpty ? 1 : _messages.length,
-                  itemBuilder: (context, index) {
-                    if (_messages.isEmpty) {
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    reverse: true, // Start from bottom
+                    itemCount: _messages.isEmpty ? 1 : _messages.length,
+                    itemBuilder: (context, index) {
+                      if (_messages.isEmpty) {
+                        return _buildMessageBubble(
+                          widget.conversation.lastMessage,
+                          false,
+                          widget.conversation.time,
+                        );
+                      }
+                      final msg = _messages[index];
                       return _buildMessageBubble(
-                        widget.conversation.lastMessage, 
-                        false, 
-                        widget.conversation.time
+                        msg['message'],
+                        msg['is_from_me'] ?? false,
+                        msg['created_time'] ?? '',
                       );
-                    }
-                    final msg = _messages[index];
-                    return _buildMessageBubble(
-                      msg['message'], 
-                      msg['is_from_me'] ?? false, 
-                      msg['created_time'] ?? ''
-                    );
-                  },
-                ),
+                    },
+                  ),
           ),
 
           // Input Area
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white, 
+              color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  blurRadius: 2, 
+                  blurRadius: 2,
                   // Fixed: withOpacity -> withValues
-                  color: Colors.grey.withValues(alpha: 0.1) 
-                )
-              ]
+                  color: Colors.grey.withValues(alpha: 0.1),
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -118,12 +122,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     decoration: InputDecoration(
                       hintText: "Type a message...",
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24), 
-                        borderSide: BorderSide.none
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: Colors.grey[100],
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                     ),
                   ),
                 ),
@@ -135,7 +142,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       // Send logic goes here
                     }
                   },
-                )
+                ),
               ],
             ),
           ),

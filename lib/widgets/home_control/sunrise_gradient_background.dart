@@ -7,10 +7,10 @@ class SunriseGradientBackground extends StatefulWidget {
   final bool isSunset; // true for sunset, false for sunrise
 
   const SunriseGradientBackground({
-    Key? key,
+    super.key,
     required this.child,
     this.isSunset = false,
-  }) : super(key: key);
+  });
 
   @override
   State<SunriseGradientBackground> createState() =>

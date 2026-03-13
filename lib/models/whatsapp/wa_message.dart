@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 
 class Message {
   final String id;
@@ -48,10 +47,10 @@ class Message {
           ? _parseDateTime(json['status_timestamp'])
           : null,
       templateId: json['template_id']?.toString(),
-      
+
       // FIXED: Robust parsing for media_info
       mediaInfo: _parseMediaInfo(json['media_info']),
-      
+
       rawData: json['raw_data'],
       createdAt: _parseDateTime(json['created_at']),
       updatedAt: _parseDateTime(json['updated_at']),
@@ -61,11 +60,11 @@ class Message {
   // FIXED: Handle cases where media_info is a string (MimeType) or a Map
   static Map<String, dynamic>? _parseMediaInfo(dynamic field) {
     if (field == null) return null;
-    
+
     if (field is Map) {
       return Map<String, dynamic>.from(field);
     }
-    
+
     if (field is String) {
       try {
         // Try decoding as JSON map
@@ -74,7 +73,7 @@ class Message {
           return Map<String, dynamic>.from(parsed);
         }
         // If it decodes to a string (double encoded) or isn't a map
-        return {'mime_type': parsed.toString()}; 
+        return {'mime_type': parsed.toString()};
       } catch (e) {
         // If it's just a plain string (e.g. "image/jpeg"), treat it as mime_type
         return {'mime_type': field};
@@ -88,8 +87,8 @@ class Message {
     if (value == null) return DateTime.now().toLocal();
     try {
       String dateString = value.toString().trim();
-      if (!dateString.endsWith('Z') && 
-          !dateString.contains('+') && 
+      if (!dateString.endsWith('Z') &&
+          !dateString.contains('+') &&
           !dateString.contains('-')) {
         dateString = '${dateString}Z';
       }
@@ -161,7 +160,7 @@ class Message {
   bool get isIncoming => direction == 'incoming';
   bool get isOutgoing => direction == 'outgoing';
   bool get isAiOutgoing => direction == 'ai_outgoing';
-  
+
   bool get isSent => status == 'sent';
   bool get isDelivered => status == 'delivered';
   bool get isRead => status == 'read';
@@ -170,7 +169,7 @@ class Message {
 
   // Check if message has media
   bool get hasMedia => mediaInfo != null && mediaInfo!.isNotEmpty;
-  
+
   // Check if message is a specific type
   bool get isText => messageType == 'text';
   bool get isImage => messageType == 'image';
@@ -182,17 +181,21 @@ class Message {
   bool get isSticker => messageType == 'sticker';
   bool get isReaction => messageType == 'reaction';
 
-  String? get fileName => mediaInfo?['filename']?.toString() ?? mediaInfo?['name']?.toString();
-  String? get fileSize => mediaInfo?['filesize']?.toString() ?? mediaInfo?['size']?.toString();
-  String? get mimeType => mediaInfo?['mime_type']?.toString() ?? mediaInfo?['type']?.toString();
+  String? get fileName =>
+      mediaInfo?['filename']?.toString() ?? mediaInfo?['name']?.toString();
+  String? get fileSize =>
+      mediaInfo?['filesize']?.toString() ?? mediaInfo?['size']?.toString();
+  String? get mimeType =>
+      mediaInfo?['mime_type']?.toString() ?? mediaInfo?['type']?.toString();
 
   // Get media URL with fallbacks (Unified version)
   String? get mediaUrl {
     // 1. Check media_info for explicit URL
     if (mediaInfo != null) {
-      final url = mediaInfo!['url']?.toString() ?? 
-                  mediaInfo!['link']?.toString() ?? 
-                  mediaInfo!['media_url']?.toString();
+      final url =
+          mediaInfo!['url']?.toString() ??
+          mediaInfo!['link']?.toString() ??
+          mediaInfo!['media_url']?.toString();
       if (url != null && url.isNotEmpty) return url;
     }
 
@@ -203,18 +206,19 @@ class Message {
 
     // 3. Fallback: Check raw_data if it contains a URL string
     if (rawData != null && rawData.toString().startsWith('http')) {
-       // Handle cases like "\"https://...\""
-       return rawData.toString().replaceAll('"', '');
+      // Handle cases like "\"https://...\""
+      return rawData.toString().replaceAll('"', '');
     }
 
     return null;
   }
 
   // ========== TIME FORMATTING METHODS ==========
-  
+
   // Get formatted time (e.g., "14:30")
-  String get formattedTime => '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-  
+  String get formattedTime =>
+      '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+
   // Get formatted time with AM/PM (e.g., "2:30 PM")
   String get formattedTime12Hour {
     final hour = timestamp.hour % 12;
@@ -222,14 +226,18 @@ class Message {
     final amPm = timestamp.hour < 12 ? 'AM' : 'PM';
     return '$hourDisplay:${timestamp.minute.toString().padLeft(2, '0')} $amPm';
   }
-  
+
   // Get formatted date (e.g., "Today", "Yesterday", "Mon", "01/01")
   String get formattedDate {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
-    final messageDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
-    
+    final messageDate = DateTime(
+      timestamp.year,
+      timestamp.month,
+      timestamp.day,
+    );
+
     if (messageDate == today) {
       return 'Today';
     } else if (messageDate == yesterday) {
@@ -241,31 +249,44 @@ class Message {
       return '${timestamp.day.toString().padLeft(2, '0')}/${timestamp.month.toString().padLeft(2, '0')}';
     }
   }
-  
+
   // Get full formatted date (e.g., "Mon, 01 Jan 2024")
   String get formattedFullDate {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return '${weekdays[timestamp.weekday - 1]}, ${timestamp.day} ${months[timestamp.month - 1]} ${timestamp.year}';
   }
-  
+
   // Check if message is from today
   bool get isToday {
     final now = DateTime.now();
-    return timestamp.year == now.year && 
-           timestamp.month == now.month && 
-           timestamp.day == now.day;
+    return timestamp.year == now.year &&
+        timestamp.month == now.month &&
+        timestamp.day == now.day;
   }
-  
+
   // Check if message is from yesterday
   bool get isYesterday {
     final now = DateTime.now();
     final yesterday = DateTime(now.year, now.month, now.day - 1);
-    return timestamp.year == yesterday.year && 
-           timestamp.month == yesterday.month && 
-           timestamp.day == yesterday.day;
+    return timestamp.year == yesterday.year &&
+        timestamp.month == yesterday.month &&
+        timestamp.day == yesterday.day;
   }
-  
+
   // Check if message is recent (within last hour)
   bool get isRecent {
     final now = DateTime.now();
@@ -278,36 +299,39 @@ extension MessageListExtensions on List<Message> {
   List<Message> get incomingMessages => where((m) => m.isIncoming).toList();
   List<Message> get outgoingMessages => where((m) => m.isOutgoing).toList();
   List<Message> get aiMessages => where((m) => m.isAiOutgoing).toList();
-  List<Message> get unreadMessages => where((m) => m.isIncoming && m.status == 'delivered').toList();
-  
+  List<Message> get unreadMessages =>
+      where((m) => m.isIncoming && m.status == 'delivered').toList();
+
   List<Message> sortByTimestamp({bool ascending = true}) {
-    return List<Message>.from(this)
-      ..sort((a, b) => ascending
+    return List<Message>.from(this)..sort(
+      (a, b) => ascending
           ? a.timestamp.compareTo(b.timestamp)
-          : b.timestamp.compareTo(a.timestamp));
+          : b.timestamp.compareTo(a.timestamp),
+    );
   }
-  
+
   List<Message> getMessagesByDate(DateTime date) {
-    return where((m) => 
-      m.timestamp.year == date.year &&
-      m.timestamp.month == date.month &&
-      m.timestamp.day == date.day
+    return where(
+      (m) =>
+          m.timestamp.year == date.year &&
+          m.timestamp.month == date.month &&
+          m.timestamp.day == date.day,
     ).toList();
   }
-  
+
   Map<DateTime, List<Message>> groupByDate() {
     final Map<DateTime, List<Message>> grouped = {};
-    
+
     for (final message in this) {
       final date = DateTime(
         message.timestamp.year,
         message.timestamp.month,
-        message.timestamp.day
+        message.timestamp.day,
       );
-      
+
       grouped.putIfAbsent(date, () => []).add(message);
     }
-    
+
     return grouped;
   }
 }

@@ -49,7 +49,8 @@ class _AnimatedSwitchState extends State<AnimatedSwitch>
     final activeColor =
         widget.activeColor ?? Theme.of(context).colorScheme.primary;
     final inactiveColor =
-        widget.inactiveColor ?? Theme.of(context).colorScheme.surfaceVariant;
+        widget.inactiveColor ??
+        Theme.of(context).colorScheme.surfaceContainerHighest;
 
     _colorAnimation = ColorTween(
       begin: inactiveColor,

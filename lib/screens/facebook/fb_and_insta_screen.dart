@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'content_screen.dart'; // Make sure this import is correct
-import 'inbox_screen.dart';   // Make sure this import is correct
+import 'inbox_screen.dart'; // Make sure this import is correct
 
 class FbAndInstaScreen extends StatefulWidget {
   const FbAndInstaScreen({super.key});
@@ -15,7 +15,7 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
   // The screens for the bottom tabs
   final List<Widget> _screens = [
     const ContentScreen(), // This screen HAS its own button already
-    const InboxScreen(),   
+    const InboxScreen(),
   ];
 
   @override
@@ -23,8 +23,8 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Facebook & Instagram', 
-          style: TextStyle(fontWeight: FontWeight.bold)
+          'Facebook & Instagram',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,

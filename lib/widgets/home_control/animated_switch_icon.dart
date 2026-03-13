@@ -8,11 +8,11 @@ class AnimatedSwitchIcon extends StatefulWidget {
   final double size;
 
   const AnimatedSwitchIcon({
-    Key? key,
+    super.key,
     required this.type,
     required this.isOn,
     this.size = 24.0,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedSwitchIcon> createState() => _AnimatedSwitchIconState();

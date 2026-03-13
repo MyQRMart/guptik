@@ -551,7 +551,7 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _category,
+                        initialValue: _category,
                         items: Constants.categories
                             .map(
                               (c) => DropdownMenuItem(
@@ -599,7 +599,7 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _language,
+                        initialValue: _language,
                         items: Constants.languages
                             .map(
                               (l) => DropdownMenuItem(
@@ -703,7 +703,7 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _headerType,
+                        initialValue: _headerType,
                         items: Constants.headerTypes
                             .map(
                               (t) => DropdownMenuItem(

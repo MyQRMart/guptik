@@ -19,9 +19,9 @@ class ChatDetailScreen extends StatefulWidget {
   final String phoneNumber;
   final String contactName;
   final String? profilePic;
-  
+
   const ChatDetailScreen({
-    super.key, 
+    super.key,
     required this.conversationId,
     required this.phoneNumber,
     required this.contactName,
@@ -36,11 +36,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
-  
+
   late MessageService _messageService;
   late ConversationService _conversationService;
   late StreamSubscription<List<Message>> _messageStreamSubscription;
-  
+
   bool _aiEnabled = false;
   bool _isLoading = true;
   bool _isSending = false;
@@ -50,7 +50,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String? _aiAgentId;
   final ImagePicker _imagePicker = ImagePicker();
   final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
-  List<Map<String, dynamic>> _selectedMedia = [];
+  final List<Map<String, dynamic>> _selectedMedia = [];
 
   List<Message> _messages = [];
 
@@ -67,16 +67,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _loadData() async {
     try {
       setState(() => _isLoading = true);
-      
+
       // Load initial messages
       _messages = await _messageService.getMessages(
         widget.conversationId,
         ascending: true,
       );
-      
+
       // Mark messages as read
       await _messageService.markMessagesAsRead(widget.conversationId);
-      
     } catch (e) {
       debugPrint('Error loading chat data: $e');
       _showError('Failed to load chat: ${e.toString()}');
@@ -90,16 +89,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _loadAIAgentStatus() async {
     try {
-      final isEnabled = await _conversationService.getAIAgentStatus(widget.conversationId);
+      final isEnabled = await _conversationService.getAIAgentStatus(
+        widget.conversationId,
+      );
       if (mounted) {
         setState(() {
           _aiEnabled = isEnabled;
-          _aiAgentId = isEnabled ? '00000000-0000-0000-0000-000000000000' : null;
+          _aiAgentId = isEnabled
+              ? '00000000-0000-0000-0000-000000000000'
+              : null;
         });
       }
     } catch (e) {
       debugPrint('Error loading AI agent status: $e');
-      
+
       if (mounted) {
         setState(() {
           _aiEnabled = false;
@@ -111,47 +114,46 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _toggleAIAssistant() async {
     if (_updatingAI) return;
-    
+
     setState(() {
       _updatingAI = true;
     });
-    
+
     try {
       final newAiEnabled = !_aiEnabled;
-      final String? newAgentId = newAiEnabled 
+      final String? newAgentId = newAiEnabled
           ? '00000000-0000-0000-0000-000000000000'
           : null;
-      
+
       await _conversationService.updateAIAgentStatus(
         conversationId: widget.conversationId,
         aiEnabled: newAiEnabled,
       );
-      
+
       if (mounted) {
         setState(() {
           _aiAgentId = newAgentId;
           _aiEnabled = newAiEnabled;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               newAgentId != null
-                ? '🤖 AI Assistant enabled for this chat'
-                : 'AI Assistant disabled for this chat',
+                  ? '🤖 AI Assistant enabled for this chat'
+                  : 'AI Assistant disabled for this chat',
             ),
             backgroundColor: newAgentId != null ? Colors.green : Colors.grey,
             duration: const Duration(seconds: 2),
           ),
         );
       }
-      
     } catch (e) {
       debugPrint('Error toggling AI assistant: $e');
-      
+
       if (mounted) {
         _showError('Failed to update AI status: ${e.toString()}');
-        
+
         setState(() {
           _aiEnabled = !_aiEnabled;
         });
@@ -168,14 +170,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void _subscribeToMessages() {
     _messageStreamSubscription = _messageService
         .subscribeToMessages(widget.conversationId)
-        .listen((messages) {
-          if (mounted) {
-            setState(() => _messages = messages);
-            _scrollToBottom();
-          }
-        }, onError: (error) {
-          debugPrint('Error in message stream: $error');
-        });
+        .listen(
+          (messages) {
+            if (mounted) {
+              setState(() => _messages = messages);
+              _scrollToBottom();
+            }
+          },
+          onError: (error) {
+            debugPrint('Error in message stream: $error');
+          },
+        );
   }
 
   void _scrollToBottom() {
@@ -205,7 +210,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         toPhoneNumber: widget.phoneNumber,
         isAI: _aiEnabled,
       );
-      
     } catch (e) {
       debugPrint('Error sending message: $e');
       _showError('Failed to send message');
@@ -228,17 +232,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       try {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
         final sdkInt = androidInfo.version.sdkInt;
-        
+
         if (sdkInt >= 33) {
           final Map<Permission, PermissionStatus> statuses = await [
             Permission.photos,
             Permission.videos,
             Permission.audio,
           ].request();
-          
+
           return statuses[Permission.photos]?.isGranted == true ||
-                 statuses[Permission.videos]?.isGranted == true ||
-                 statuses[Permission.audio]?.isGranted == true;
+              statuses[Permission.videos]?.isGranted == true ||
+              statuses[Permission.audio]?.isGranted == true;
         } else {
           final status = await Permission.storage.request();
           return status.isGranted;
@@ -259,13 +263,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       try {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
         final sdkInt = androidInfo.version.sdkInt;
-        
+
         if (sdkInt >= 30) {
           final manageStatus = await Permission.manageExternalStorage.request();
           if (manageStatus.isGranted) {
             return true;
           }
-          
+
           return await _requestMediaPermission();
         } else {
           final status = await Permission.storage.request();
@@ -284,7 +288,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _pickFromGallery() async {
     _showAttachmentMenu = false;
-    
+
     final hasPermission = await _requestMediaPermission();
     if (!hasPermission) {
       _showError('Permission denied to access gallery');
@@ -292,7 +296,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
 
     try {
-      final List<XFile>? images = await _imagePicker.pickMultiImage(
+      final List<XFile> images = await _imagePicker.pickMultiImage(
         imageQuality: 80,
         maxWidth: 1920,
       );
@@ -315,7 +319,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _takePhoto() async {
     _showAttachmentMenu = false;
-    
+
     final cameraStatus = await Permission.camera.request();
     if (!cameraStatus.isGranted) {
       _showError('Camera permission denied');
@@ -345,7 +349,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _pickVideo() async {
     _showAttachmentMenu = false;
-    
+
     final hasPermission = await _requestMediaPermission();
     if (!hasPermission) {
       _showError('Permission denied to access videos');
@@ -374,19 +378,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _recordAudio() async {
     _showAttachmentMenu = false;
-    
+
     final micStatus = await Permission.microphone.request();
     if (!micStatus.isGranted) {
       _showError('Microphone permission denied');
       return;
     }
-    
+
     final storagePermission = await _requestStoragePermission();
     if (!storagePermission) {
       _showError('Storage permission denied to save recording');
       return;
     }
-    
+
     _showAudioRecordingDialog();
   }
 
@@ -400,7 +404,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             await _sendMediaMessage(
               filePath: filePath,
               messageType: 'audio',
-              fileName: 'audio_message_${DateTime.now().millisecondsSinceEpoch}.m4a',
+              fileName:
+                  'audio_message_${DateTime.now().millisecondsSinceEpoch}.m4a',
               mimeType: 'audio/m4a',
             );
           }
@@ -411,7 +416,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _pickDocument() async {
     _showAttachmentMenu = false;
-    
+
     final hasPermission = await _requestStoragePermission();
     if (!hasPermission) {
       _showError('Storage permission denied');
@@ -425,18 +430,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         withData: false,
         withReadStream: false,
       );
-      
+
       if (result != null && result.files.isNotEmpty) {
         PlatformFile file = result.files.first;
-        
+
         if (file.path == null) {
           _showError('Could not access the selected file');
           return;
         }
-        
+
         String messageType = 'document';
         String? mimeType = file.extension;
-        
+
         if (mimeType == null || mimeType.isEmpty) {
           mimeType = 'application/octet-stream';
         } else {
@@ -497,10 +502,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               mimeType = 'application/octet-stream';
           }
         }
-        
+
         final fileObj = File(file.path!);
         final fileSize = await fileObj.length();
-        
+
         if (messageType == 'image' && fileSize > 5 * 1024 * 1024) {
           _showError('Image size too large (max 5MB)');
           return;
@@ -509,13 +514,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           return;
         } else if (messageType == 'document' && fileSize > 100 * 1024 * 1024) {
           _showError('Document size too large (max 100MB)');
-          
+
           return;
         } else if (messageType == 'audio' && fileSize > 16 * 1024 * 1024) {
           _showError('Audio size too large (max 16MB)');
           return;
         }
-        
+
         await _sendMediaMessage(
           filePath: file.path!,
           messageType: messageType,
@@ -541,12 +546,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     try {
       final file = File(filePath);
       final fileSize = await file.length();
-      
+
       if (messageType == 'image' && fileSize > 5 * 1024 * 1024) {
         _showError('Image size too large (max 5MB)');
         return;
       }
-      
+
       if (messageType == 'video' && fileSize > 16 * 1024 * 1024) {
         _showError('Video size too large (max 16MB)');
         return;
@@ -563,7 +568,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
 
       final mediaUrl = uploadResult['url'] as String;
-      
+
       final mediaInfo = {
         'url': mediaUrl,
         'filename': fileName,
@@ -583,7 +588,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       );
 
       debugPrint('✅ Media message sent successfully!');
-
     } catch (e) {
       debugPrint('❌ Error sending media: $e');
       _showError('Failed to send media: ${e.toString()}');
@@ -654,7 +658,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Delete', style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
                 onTap: () => Navigator.pop(context, 'delete'),
               ),
             ],
@@ -670,9 +677,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         break;
       case 'copy':
         await Clipboard.setData(ClipboardData(text: message.content));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message copied')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Message copied')));
         break;
       case 'retry':
         await _messageService.retryFailedMessage(message.messageId);
@@ -698,11 +705,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -711,10 +714,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.contactName),
-            Text(
-              widget.phoneNumber,
-              style: const TextStyle(fontSize: 12),
-            ),
+            Text(widget.phoneNumber, style: const TextStyle(fontSize: 12)),
           ],
         ),
         actions: [
@@ -726,7 +726,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   color: _aiEnabled ? Colors.yellow : Colors.white,
                 ),
                 onPressed: _updatingAI ? null : _toggleAIAssistant,
-                tooltip: _aiEnabled ? 'Disable AI Assistant' : 'Enable AI Assistant',
+                tooltip: _aiEnabled
+                    ? 'Disable AI Assistant'
+                    : 'Enable AI Assistant',
               ),
               if (_updatingAI)
                 Positioned(
@@ -760,11 +762,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               if (_aiEnabled)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 16,
+                  ),
                   color: Colors.yellow.withValues(alpha: 0.1),
                   child: Row(
                     children: [
-                      Icon(Icons.auto_awesome, size: 16, color: Colors.yellow[700]),
+                      Icon(
+                        Icons.auto_awesome,
+                        size: 16,
+                        color: Colors.yellow[700],
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -779,18 +788,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ],
                   ),
                 ),
-              
+
               Expanded(
                 child: _messages.isEmpty
                     ? const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey),
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 80,
+                              color: Colors.grey,
+                            ),
                             SizedBox(height: 16),
                             Text(
                               'No messages yet',
-                              style: TextStyle(fontSize: 18, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -810,7 +826,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         },
                       ),
               ),
-              
+
               Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
@@ -831,28 +847,33 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         onPressed: _showAttachmentOptions,
                       ),
                     ),
-                    
+
                     const SizedBox(width: 8.0),
-                    
+
                     Expanded(
                       child: TextField(
                         controller: _messageController,
                         focusNode: _messageFocusNode,
                         decoration: InputDecoration(
-                          hintText: _aiEnabled ? 'Type a message (AI assisted)...' : 'Type a message...',
+                          hintText: _aiEnabled
+                              ? 'Type a message (AI assisted)...'
+                              : 'Type a message...',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24.0),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
                         ),
                         maxLines: null,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
-                    
+
                     const SizedBox(width: 8.0),
-                    
+
                     Container(
                       decoration: BoxDecoration(
                         color: _aiEnabled ? Colors.purple : Colors.blue,
@@ -863,7 +884,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           _aiEnabled ? Icons.auto_awesome : Icons.send,
                           color: Colors.white,
                         ),
-                        onPressed: _isSending || _isUploading ? null : _sendMessage,
+                        onPressed: _isSending || _isUploading
+                            ? null
+                            : _sendMessage,
                       ),
                     ),
                   ],
@@ -871,7 +894,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
             ],
           ),
-          
+
           AttachmentMenu(
             showAttachmentMenu: _showAttachmentMenu,
             onPickGallery: _pickFromGallery,
@@ -880,7 +903,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             onRecordAudio: _recordAudio,
             onPickDocument: _pickDocument,
           ),
-          
+
           if (_isUploading)
             Positioned.fill(
               child: Container(
@@ -912,5 +935,5 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _messageFocusNode.dispose();
     _messageStreamSubscription.cancel();
     super.dispose();
-  } 
+  }
 }

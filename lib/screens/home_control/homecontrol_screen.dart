@@ -74,11 +74,12 @@ class _HomeControlBodyState extends State<HomeControlBody> {
         );
       }
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           _homes = homes;
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);

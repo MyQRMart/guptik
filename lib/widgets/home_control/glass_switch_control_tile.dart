@@ -13,12 +13,12 @@ class GlassSwitchControlTile extends StatelessWidget {
   final Function(String) onNameChanged;
 
   const GlassSwitchControlTile({
-    Key? key,
+    super.key,
     required this.device,
     required this.onToggle,
     required this.onTypeChanged,
     required this.onNameChanged,
-  }) : super(key: key);
+  });
 
   Color _getTypeColor() {
     switch (device.type) {
