@@ -46,6 +46,7 @@ dependencies:
   share_plus: ^10.0.0
   flutter_facebook_auth: ^7.1.5
   mime: ^1.0.3
+  webview_flutter: ^4.13.1
 
 
 dev_dependencies:

@@ -19,7 +19,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   debugPrint('==== APP START ====');
-  
+
   // Better error handling for debugging
   if (kDebugMode) {
     // In debug mode, show detailed error information
@@ -27,17 +27,20 @@ Future<void> main() async {
       debugPrint('Flutter Error: ${details.exception}');
       debugPrint('Widget: ${details.context}');
       debugPrint('Stack trace: ${details.stack}');
-      
+
       if (details.toString().contains('ParentDataWidget')) {
-        debugPrint('ParentDataWidget error detected - check for Expanded/Flexible widgets outside Row/Column');
+        debugPrint(
+          'ParentDataWidget error detected - check for Expanded/Flexible widgets outside Row/Column',
+        );
         debugPrint('Full error: ${details.toString()}');
       }
       FlutterError.presentError(details);
     };
   } else {
     // Only suppress overflow errors in production
-    ErrorWidget.builder = (FlutterErrorDetails details) => const SizedBox.shrink();
-    
+    ErrorWidget.builder = (FlutterErrorDetails details) =>
+        const SizedBox.shrink();
+
     FlutterError.onError = (FlutterErrorDetails details) {
       if (details.toString().contains('RenderFlex overflowed') ||
           details.toString().contains('overflow') ||
@@ -47,7 +50,7 @@ Future<void> main() async {
       FlutterError.presentError(details);
     };
   }
-  
+
   try {
     debugPrint('Initializing Supabase...');
     // Add delay for web platform to ensure JS libraries are loaded
@@ -62,7 +65,6 @@ Future<void> main() async {
       debug: kDebugMode,
     );
     debugPrint('Supabase initialized successfully');
-    
   } catch (e) {
     debugPrint('Supabase initialization error: $e');
     debugPrint('Stack: ${StackTrace.current}');
@@ -124,15 +126,16 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
         if (child == null) return Container();
-        
+
         // AGGRESSIVE error suppression in builder
-        ErrorWidget.builder = (FlutterErrorDetails details) => const SizedBox.shrink();
-        
+        ErrorWidget.builder = (FlutterErrorDetails details) =>
+            const SizedBox.shrink();
+
         // Wrap everything to catch and suppress all possible errors
         return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(1.0),
-          ),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(1.0)),
           child: Builder(
             builder: (context) {
               try {
