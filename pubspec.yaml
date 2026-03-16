@@ -47,6 +47,7 @@ dependencies:
   flutter_facebook_auth: ^7.1.5
   mime: ^1.0.3
   webview_flutter: ^4.13.1
+  chewie: ^1.7.4
 
 
 dev_dependencies:

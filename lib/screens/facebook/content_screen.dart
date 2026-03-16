@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:guptik/models/facebook/meta_content_model.dart';
 import 'package:guptik/services/facebook/meta_service.dart';
 import 'package:guptik/widgets/facebook/meta_grid_card.dart';
-import 'create_post_screen.dart';
 import 'fullscreen_media_screen.dart';
 
 class ContentScreen extends StatefulWidget {
@@ -14,11 +13,26 @@ class ContentScreen extends StatefulWidget {
 
 class _ContentScreenState extends State<ContentScreen> {
   final MetaService _metaService = MetaService();
+  late Future<List<MetaContent>> _contentFuture;
 
   SocialPlatform _selectedPlatform = SocialPlatform.facebook;
   ContentType _selectedFilter = ContentType.post;
 
-  // --- Helper: Build Filter Chips (Posts, Reels, Stories, Mentions) ---
+  @override
+  void initState() {
+    super.initState();
+    _loadContent();
+  }
+
+  void _loadContent() {
+    setState(() {
+      _contentFuture = _metaService.getContent(
+        _selectedPlatform,
+        _selectedFilter,
+      );
+    });
+  }
+
   Widget _buildFilterChip(String label, ContentType type) {
     final isSelected = _selectedFilter == type;
     final primaryColor = _selectedPlatform == SocialPlatform.facebook
@@ -26,21 +40,21 @@ class _ContentScreenState extends State<ContentScreen> {
         : const Color(0xFFE1306C);
 
     return Padding(
-      padding: const EdgeInsets.only(right: 10.0),
+      padding: const EdgeInsets.only(right: 8.0),
       child: GestureDetector(
         onTap: () {
           setState(() {
             _selectedFilter = type;
+            _loadContent();
           });
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? primaryColor : Colors.grey[100],
-            borderRadius: BorderRadius.circular(20),
+            color: isSelected ? primaryColor : Colors.white,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSelected ? primaryColor : Colors.grey[300]!,
-              width: 1.5,
             ),
           ),
           child: Text(
@@ -48,7 +62,7 @@ class _ContentScreenState extends State<ContentScreen> {
             style: TextStyle(
               color: isSelected ? Colors.white : Colors.grey[700],
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              fontSize: 13,
+              fontSize: 12,
             ),
           ),
         ),
@@ -56,10 +70,9 @@ class _ContentScreenState extends State<ContentScreen> {
     );
   }
 
-  // --- Helper: Build Platform Tabs (FB vs IG) ---
-  Widget _buildTabBtn(String label, SocialPlatform platform) {
+  Widget _buildPlatformChip(String label, SocialPlatform platform) {
     final isSelected = _selectedPlatform == platform;
-    final primaryColor = platform == SocialPlatform.facebook
+    final color = platform == SocialPlatform.facebook
         ? const Color(0xFF1877F2)
         : const Color(0xFFE1306C);
 
@@ -68,25 +81,23 @@ class _ContentScreenState extends State<ContentScreen> {
         onTap: () {
           setState(() {
             _selectedPlatform = platform;
-            _selectedFilter = ContentType
-                .post; // Reset filter to 'Post' when switching platforms
+            _loadContent();
           });
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected
-                ? primaryColor.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            color: isSelected ? color : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isSelected ? color : Colors.grey[300]!),
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                color: isSelected ? primaryColor : Colors.grey[600],
-                fontSize: 15,
+                color: isSelected ? Colors.white : color,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 13,
               ),
             ),
           ),
@@ -97,40 +108,35 @@ class _ContentScreenState extends State<ContentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: Column(
+    return Container(
+      color: Colors.grey[50],
+      child: Column(
         children: [
-          // 1. Header with Platform Toggle (FB / IG) and Filters
+          // Platform & Filter Bar
           Container(
+            padding: const EdgeInsets.all(12),
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Column(
               children: [
-                // Platform Toggle
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildTabBtn('Facebook', SocialPlatform.facebook),
-                      _buildTabBtn('Instagram', SocialPlatform.instagram),
-                    ],
-                  ),
+                // Platform Chips
+                Row(
+                  children: [
+                    _buildPlatformChip('Facebook', SocialPlatform.facebook),
+                    const SizedBox(width: 8),
+                    _buildPlatformChip('Instagram', SocialPlatform.instagram),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
                 // Filter Chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildFilterChip("Posts", ContentType.post),
-                      _buildFilterChip("Reels", ContentType.reel),
-                      _buildFilterChip("Stories", ContentType.story),
-                      _buildFilterChip("Mentions", ContentType.mention),
+                      _buildFilterChip('Posts', ContentType.post),
+                      _buildFilterChip('Reels', ContentType.reel),
+                      _buildFilterChip('Stories', ContentType.story),
+                      _buildFilterChip('Mentions', ContentType.mention),
                     ],
                   ),
                 ),
@@ -138,95 +144,120 @@ class _ContentScreenState extends State<ContentScreen> {
             ),
           ),
 
-          // 3. Main Content Grid
+          // Content Area - List View Only
           Expanded(
-            child: FutureBuilder<List<MetaContent>>(
-              // Calling Service with selected filters
-              future: _metaService.getContent(
-                _selectedPlatform,
-                _selectedFilter,
-              ),
-
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text("Error loading content.\n${snapshot.error}"),
-                  );
-                }
-
-                final posts = snapshot.data ?? [];
-
-                if (posts.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.grid_off, size: 40, color: Colors.grey[400]),
-                        const SizedBox(height: 10),
-                        Text(
-                          "No ${_selectedFilter.name}s found.",
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                // Grid View
-                return GridView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 1,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.1,
-                  ),
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) {
-                    return GestureDetector(
-                      onTap: () {
-                        // ✅ NAVIGATION: Opens Full Screen Media (only if image exists)
-                        if (posts[index].imageUrl.isNotEmpty) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FullScreenMediaScreen(
-                                imageUrl: posts[index].imageUrl,
-                                caption: posts[index].caption,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      child: MetaGridCard(content: posts[index]),
-                    );
-                  },
-                );
+            child: RefreshIndicator(
+              onRefresh: () async {
+                _loadContent();
               },
+              child: FutureBuilder<List<MetaContent>>(
+                future: _contentFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error loading content',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: _loadContent,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1877F2),
+                            ),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final posts = snapshot.data ?? [];
+
+                  if (posts.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.grid_off,
+                              size: 32,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No ${_selectedFilter.name}s found',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Create your first post to get started',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // LIST VIEW - Single column with inline comments
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(10),
+                    itemCount: posts.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GestureDetector(
+                          onTap: () {
+                            if (posts[index].imageUrl != null &&
+                                posts[index].imageUrl!.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FullScreenMediaScreen(
+                                    imageUrl: posts[index].imageUrl!,
+                                    caption: posts[index].caption,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: MetaGridCard(
+                            content: posts[index],
+                            onPostUpdated: _loadContent,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
-      ),
-
-      // 4. Floating Action Button
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: _selectedPlatform == SocialPlatform.facebook
-            ? const Color(0xFF1877F2)
-            : const Color(0xFFE1306C),
-        child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CreatePostScreen()),
-          );
-        },
       ),
     );
   }

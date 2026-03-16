@@ -5,7 +5,8 @@ class MetaChat {
   final String senderName;
   final String lastMessage;
   final String time; // Display string like "10:30 AM"
-  final String? rawTimestamp; // NEW: ISO string for sorting (e.g. "2023-10-27T10:30:00")
+  final String?
+  rawTimestamp; // NEW: ISO string for sorting (e.g. "2023-10-27T10:30:00")
   final String avatarUrl;
   final SocialPlatform platform;
   final bool isUnread;
