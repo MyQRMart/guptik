@@ -24,31 +24,6 @@ class _FacebookAndInstagramScreenState
   final List<Map<String, dynamic>> _accounts = [];
   bool _isLoading = false;
 
-  // ── All data fetched during the login flow ──
-  String? _userToken;
-  String? _fbAccountId;
-  String? _fbName;
-
-  // Selected page & Instagram
-  String? _selectedPageToken;
-  String? _selectedPageId;
-  String? _selectedPageName;
-  String? _selectedIgAccountId;
-
-  // Selected Business
-  String? _selectedBusinessId;
-  String? _selectedBusinessName;
-
-  // WhatsApp
-  String? _whatsappPhoneNumberId;
-  String? _whatsappPhoneNumber; // The actual mobile number e.g. +91XXXXXXXXXX
-  String? _selectedWabaId;
-
-  // Raw lists for letting the user pick (if multiple)
-  List<Map<String, dynamic>> _pages = [];
-  List<Map<String, dynamic>> _businesses = [];
-  List<Map<String, dynamic>> _wabaPhoneNumbers = [];
-
   @override
   void initState() {
     super.initState();
@@ -71,7 +46,7 @@ class _FacebookAndInstagramScreenState
           .maybeSingle();
 
       if (mounted && response != null) {
-        final hasData =
+        bool hasData =
             response['facebook_user_access_token'] != null ||
             response['facebook_account_id'] != null;
 
@@ -103,15 +78,6 @@ class _FacebookAndInstagramScreenState
   // 2. SAVE ALL SETTINGS TO SUPABASE
   // ─────────────────────────────────────────────────────────────────────────
   Future<void> _saveSettingsToSupabase() async {
-    if (_userToken == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please connect your Facebook account first.'),
-        ),
-      );
-      return;
-    }
-
     try {
       Navigator.pop(context);
       setState(() => _isLoading = true);
@@ -182,9 +148,8 @@ class _FacebookAndInstagramScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error saving: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -207,14 +172,8 @@ class _FacebookAndInstagramScreenState
             'facebook_user_access_token': null,
             'facebook_account_id': null,
             'facebook_page_access_token': null,
-            'instagram_access_token': null,
             'instagram_account_id': null,
-            'meta_business_account_id': null,
-            'meta_business_name': null,
-            'whatsapp_access_token': null,
-            'meta_wa_phone_number_id': null,
-            'mobile_number': null,
-            'meta_app_id': null,
+            'instagram_access_token': null,
           })
           .eq('id', accountId);
 
@@ -237,7 +196,7 @@ class _FacebookAndInstagramScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error removing: $e')));
+      ).showSnackBar(SnackBar(content: Text('Error removing settings: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -299,415 +258,60 @@ class _FacebookAndInstagramScreenState
       final userToken = result.accessToken!.tokenString;
       final userData = await FacebookAuth.instance.getUserData();
 
-      setState(() {
-        _userToken = userToken;
-        _fbAccountId = userData['id'];
-        _fbName = userData['name'];
-      });
+        _facebookTokenController.text = userToken;
+        _facebookAccountIdController.text = userData['id'];
+        _fetchedFbName = userData['name'];
 
-      // ── GRAPH API CALL 1: Pages + Linked Instagram Accounts ──────────────
-      await _fetchPagesAndInstagram(userToken);
+        // 2. Automatically Fetch Page Tokens and Instagram ID from Graph API
+        try {
+          final url = Uri.parse(
+            'https://graph.facebook.com/v19.0/me/accounts?fields=access_token,name,instagram_business_account&access_token=$userToken',
+          );
 
-      // ── GRAPH API CALL 2: Businesses ──────────────────────────────────────
-      await _fetchBusinesses(userToken);
+          final graphResponse = await http.get(url);
 
-      // ── GRAPH API CALLS 3 & 4: WhatsApp Business → Phone Numbers ─────────
-      if (_businesses.isNotEmpty) {
-        await _fetchWhatsAppNumbers(userToken, _businesses.first['id']);
-      }
+          if (graphResponse.statusCode == 200) {
+            final data = jsonDecode(graphResponse.body);
 
-      if (mounted) {
-        _showSnack(
-          '✅ Connected as $_fbName! Review selections and tap Save.',
-          isError: false,
-        );
-      }
-    } catch (e) {
-      debugPrint("Login error: $e");
-      _showSnack('Error: $e', isError: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+            if (data['data'] != null && data['data'].isNotEmpty) {
+              // Grabbing the first page linked to the account for simplicity
+              final pageData = data['data'][0];
+              _fetchedPageToken = pageData['access_token'];
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // GRAPH API CALL 1: /me/accounts — Pages + linked Instagram
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<void> _fetchPagesAndInstagram(String userToken) async {
-    try {
-      final url = Uri.parse(
-        'https://graph.facebook.com/$kGraphVersion/me/accounts'
-        '?fields=id,name,access_token,instagram_business_account'
-        '&access_token=$userToken',
-      );
-      final res = await http.get(url);
-      if (res.statusCode != 200) {
-        debugPrint('Pages API error: ${res.body}');
-        return;
-      }
-      final data = jsonDecode(res.body);
-      final List pages = data['data'] ?? [];
-
-      setState(() {
-        _pages = pages
-            .map<Map<String, dynamic>>(
-              (p) => {
-                'id': p['id'],
-                'name': p['name'],
-                'access_token': p['access_token'],
-                'instagram_business_account':
-                    p['instagram_business_account']?['id'],
-              },
-            )
-            .toList();
-
-        // Auto-select first page that has an Instagram account; fallback to first page
-        final pageWithIg = _pages.firstWhere(
-          (p) => p['instagram_business_account'] != null,
-          orElse: () => _pages.isNotEmpty ? _pages.first : {},
-        );
-
-        if (pageWithIg.isNotEmpty) {
-          _selectedPageToken = pageWithIg['access_token'];
-          _selectedPageId = pageWithIg['id'];
-          _selectedPageName = pageWithIg['name'];
-          _selectedIgAccountId = pageWithIg['instagram_business_account'];
+              if (pageData['instagram_business_account'] != null) {
+                _fetchedInstagramAccountId =
+                    pageData['instagram_business_account']['id'];
+              }
+            }
+          }
+        } catch (apiError) {
+          debugPrint("Graph API Fetch Error: $apiError");
         }
-      });
 
-      debugPrint('✅ Pages fetched: ${_pages.length}');
-    } catch (e) {
-      debugPrint('Error fetching pages: $e');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // GRAPH API CALL 2: /me/businesses — Business Accounts
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<void> _fetchBusinesses(String userToken) async {
-    try {
-      final url = Uri.parse(
-        'https://graph.facebook.com/$kGraphVersion/me/businesses'
-        '?fields=id,name'
-        '&access_token=$userToken',
-      );
-      final res = await http.get(url);
-      if (res.statusCode != 200) {
-        debugPrint('Businesses API error: ${res.body}');
-        return;
-      }
-      final data = jsonDecode(res.body);
-      final List biz = data['data'] ?? [];
-
-      setState(() {
-        _businesses = biz
-            .map<Map<String, dynamic>>(
-              (b) => {'id': b['id'], 'name': b['name']},
-            )
-            .toList();
-
-        if (_businesses.isNotEmpty) {
-          _selectedBusinessId = _businesses.first['id'];
-          _selectedBusinessName = _businesses.first['name'];
-        }
-      });
-
-      debugPrint('✅ Businesses fetched: ${_businesses.length}');
-    } catch (e) {
-      debugPrint('Error fetching businesses: $e');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // GRAPH API CALL 3+4: WABA → Phone Numbers
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<void> _fetchWhatsAppNumbers(
-    String userToken,
-    String businessId,
-  ) async {
-    try {
-      // Step A: Get WhatsApp Business Accounts under this Business
-      final wabaUrl = Uri.parse(
-        'https://graph.facebook.com/$kGraphVersion/$businessId/owned_whatsapp_business_accounts'
-        '?fields=id,name'
-        '&access_token=$userToken',
-      );
-      final wabaRes = await http.get(wabaUrl);
-      if (wabaRes.statusCode != 200) {
-        debugPrint('WABA API error: ${wabaRes.body}');
-        return;
-      }
-      final wabaData = jsonDecode(wabaRes.body);
-      final List wabas = wabaData['data'] ?? [];
-
-      if (wabas.isEmpty) {
-        debugPrint('No WABA found for business $businessId');
-        return;
-      }
-
-      final wabaId = wabas.first['id'];
-      setState(() => _selectedWabaId = wabaId);
-
-      // Step B: Get Phone Numbers under this WABA
-      final phoneUrl = Uri.parse(
-        'https://graph.facebook.com/$kGraphVersion/$wabaId/phone_numbers'
-        '?fields=id,display_phone_number,verified_name'
-        '&access_token=$userToken',
-      );
-      final phoneRes = await http.get(phoneUrl);
-      if (phoneRes.statusCode != 200) {
-        debugPrint('Phone Numbers API error: ${phoneRes.body}');
-        return;
-      }
-      final phoneData = jsonDecode(phoneRes.body);
-      final List phones = phoneData['data'] ?? [];
-
-      setState(() {
-        _wabaPhoneNumbers = phones
-            .map<Map<String, dynamic>>(
-              (p) => {
-                'id': p['id'], // This is meta_wa_phone_number_id
-                'display_phone_number':
-                    p['display_phone_number'], // This is mobile_number
-                'verified_name': p['verified_name'],
-              },
-            )
-            .toList();
-
-        if (_wabaPhoneNumbers.isNotEmpty) {
-          _whatsappPhoneNumberId = _wabaPhoneNumbers.first['id'];
-          _whatsappPhoneNumber =
-              _wabaPhoneNumbers.first['display_phone_number'];
-        }
-      });
-
-      debugPrint(
-        '✅ WhatsApp phone numbers fetched: ${_wabaPhoneNumbers.length}',
-      );
-    } catch (e) {
-      debugPrint('Error fetching WhatsApp numbers: $e');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // UI HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
-  void _showSnack(String message, {required bool isError}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
-  }
-
-  String _maskToken(String? token) {
-    if (token == null || token.isEmpty) return "Not Set";
-    if (token.length <= 8) return "****";
-    return "••••••••${token.substring(token.length - 6)}";
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // DIALOG — Shows login button + selection dropdowns if multiple options
-  // ─────────────────────────────────────────────────────────────────────────
-  void _showConfigDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Connect Meta Suite'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Login Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      await _handleFacebookLogin();
-                      setDialogState(() {}); // Refresh dialog UI after login
-                    },
-                    icon: const Icon(Icons.facebook, color: Colors.white),
-                    label: Text(
-                      _userToken == null
-                          ? "Login with Facebook"
-                          : "Re-Login (${_fbName ?? ''})",
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1877F2),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-
-                if (_isLoading) ...[
-                  const SizedBox(height: 16),
-                  const CircularProgressIndicator(),
-                  const Text('Fetching your Meta data...'),
-                ],
-
-                // ── Page Selector ──────────────────────────────────────────
-                if (_pages.length > 1) ...[
-                  const SizedBox(height: 16),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Select Facebook Page:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  DropdownButton<String>(
-                    isExpanded: true,
-                    value: _selectedPageId,
-                    items: _pages.map((p) {
-                      return DropdownMenuItem<String>(
-                        value: p['id'],
-                        child: Text(
-                          '${p['name']} (${p['instagram_business_account'] != null ? '✅IG' : '❌IG'})',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        final page = _pages.firstWhere((p) => p['id'] == val);
-                        _selectedPageId = page['id'];
-                        _selectedPageName = page['name'];
-                        _selectedPageToken = page['access_token'];
-                        _selectedIgAccountId =
-                            page['instagram_business_account'];
-                      });
-                    },
-                  ),
-                ],
-
-                // ── Business Selector ──────────────────────────────────────
-                if (_businesses.length > 1) ...[
-                  const SizedBox(height: 8),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Select Business Account:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  DropdownButton<String>(
-                    isExpanded: true,
-                    value: _selectedBusinessId,
-                    items: _businesses.map((b) {
-                      return DropdownMenuItem<String>(
-                        value: b['id'],
-                        child: Text(b['name'], overflow: TextOverflow.ellipsis),
-                      );
-                    }).toList(),
-                    onChanged: (val) async {
-                      setDialogState(() => _selectedBusinessId = val);
-                      // Re-fetch WhatsApp numbers for the newly selected business
-                      if (_userToken != null && val != null) {
-                        await _fetchWhatsAppNumbers(_userToken!, val);
-                        setDialogState(() {});
-                      }
-                    },
-                  ),
-                ],
-
-                // ── WhatsApp Phone Number Selector ─────────────────────────
-                if (_wabaPhoneNumbers.length > 1) ...[
-                  const SizedBox(height: 8),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Select WhatsApp Number:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  DropdownButton<String>(
-                    isExpanded: true,
-                    value: _whatsappPhoneNumberId,
-                    items: _wabaPhoneNumbers.map((p) {
-                      return DropdownMenuItem<String>(
-                        value: p['id'],
-                        child: Text(p['display_phone_number']),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        final phone = _wabaPhoneNumbers.firstWhere(
-                          (p) => p['id'] == val,
-                        );
-                        _whatsappPhoneNumberId = phone['id'];
-                        _whatsappPhoneNumber = phone['display_phone_number'];
-                      });
-                    },
-                  ),
-                ],
-
-                // ── Summary after login ────────────────────────────────────
-                if (_userToken != null) ...[
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  _summaryRow('FB User', _fbName ?? '—'),
-                  _summaryRow('Page', _selectedPageName ?? '—'),
-                  _summaryRow('IG Account ID', _selectedIgAccountId ?? 'None'),
-                  _summaryRow('Business', _selectedBusinessName ?? '—'),
-                  _summaryRow('WA Number', _whatsappPhoneNumber ?? 'None'),
-                ],
-
-                const SizedBox(height: 8),
-                const Text(
-                  '⚠️ App Secret is NEVER stored here — keep it in your n8n/backend env only.',
-                  style: TextStyle(fontSize: 11, color: Colors.orange),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: _userToken != null ? _saveSettingsToSupabase : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Connected as $_fetchedFbName! Click Save to confirm.',
               ),
-              child: const Text('Save All to Database'),
+              backgroundColor: Colors.green,
             ),
-          ],
-        ),
-      ),
-    );
+          );
+        }
+      } else if (result.status == LoginStatus.cancelled) {
+        debugPrint("User cancelled the login.");
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login Error: ${result.message}')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("An error occurred: $e");
+    }
   }
 
-  Widget _summaryRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 12),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // BUILD
-  // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -772,10 +376,8 @@ class _FacebookAndInstagramScreenState
           children: [
             Icon(Icons.link_off, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
-            Text(
-              'No social accounts connected.',
-              style: TextStyle(color: Colors.grey[500]),
-            ),
+            Text('No social accounts connected.',
+                style: TextStyle(color: Colors.grey[500])),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _showConfigDialog,
@@ -808,29 +410,33 @@ class _FacebookAndInstagramScreenState
                   "Active Configuration",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: _showConfigDialog,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () => _clearSocialSettings(index),
-                    ),
-                  ],
-                ),
+                Row(children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: _showConfigDialog,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () => _clearSocialSettings(index),
+                  ),
+                ]),
               ],
             ),
             const Divider(),
 
             if (account['facebook_token'] != null) ...[
-              _sectionHeader('Facebook User', Colors.blue),
+              const Text(
+                "Facebook User",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
               _buildInfoRow(
                 "Account ID",
-                account['facebook_account_id'] ?? '—',
+                account['facebook_account_id'] ?? 'Not Set',
               ),
-              _buildInfoRow("Token", _maskToken(account['facebook_token'])),
+              _buildInfoRow("Token", maskToken(account['facebook_token'])),
               const SizedBox(height: 12),
             ],
 
@@ -881,9 +487,7 @@ class _FacebookAndInstagramScreenState
             child: Text(
               "$label:",
               style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
-              ),
+                  fontWeight: FontWeight.w500, color: Colors.grey),
             ),
           ),
           Expanded(
