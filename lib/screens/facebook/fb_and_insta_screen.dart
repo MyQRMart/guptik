@@ -20,12 +20,20 @@ class FbAndInstaScreen extends StatefulWidget {
 class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
   final MetaService _metaService = MetaService();
   int _currentIndex = 0;
+  final ScrollController _scrollController = ScrollController();
 
   // User profile data
   String? _userAvatarUrl;
   String? _userName;
   String? _userEmail;
   bool _isLoadingUser = true;
+
+  // Page/Account names and profile pictures
+  String? _facebookPageName;
+  String? _facebookPagePicture;
+  String? _instagramAccountName;
+  String? _instagramAccountPicture;
+  bool _isLoadingPageNames = true;
 
   // Real data variables
   int _fbFollowers = 0;
@@ -39,6 +47,7 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _loadPageNames();
     _loadStats();
   }
 
@@ -64,20 +73,38 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
     }
   }
 
+  Future<void> _loadPageNames() async {
+    setState(() => _isLoadingPageNames = true);
+
+    try {
+      final pageInfo = await _metaService.getPageInfo();
+
+      if (mounted) {
+        setState(() {
+          _facebookPageName = pageInfo['facebook_page_name'];
+          _facebookPagePicture = pageInfo['facebook_page_picture'];
+          _instagramAccountName = pageInfo['instagram_account_name'];
+          _instagramAccountPicture = pageInfo['instagram_account_picture'];
+          _isLoadingPageNames = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading page names: $e");
+      setState(() => _isLoadingPageNames = false);
+    }
+  }
+
   Future<void> _loadStats() async {
     setState(() => _isLoadingStats = true);
 
     try {
-      // Fetch Facebook followers
       final fbInsights = await _metaService.getPageInsights(
         SocialPlatform.facebook,
       );
-      // Fetch Instagram followers
       final igInsights = await _metaService.getPageInsights(
         SocialPlatform.instagram,
       );
 
-      // Calculate engagement rate (average of both platforms)
       double fbEngagement = fbInsights?.engagementRate ?? 0;
       double igEngagement = igInsights?.engagementRate ?? 0;
       double avgEngagement = (fbEngagement + igEngagement) / 2;
@@ -209,15 +236,15 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
       child: Column(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 24),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[700])),
         ],
       ),
@@ -227,186 +254,445 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.grey[50]!, Colors.white],
-          ),
-        ),
-        child: Column(
-          children: [
-            // Professional Header with Avatar (No Popup)
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 5),
+      body: NestedScrollView(
+        controller: _scrollController,
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              expandedHeight: 280,
+              floating: false,
+              pinned: true,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              automaticallyImplyLeading: false, // Removes duplicate back button
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.white, Colors.grey[50]!],
+                    ),
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Profile Avatar - Top Left (No GestureDetector, just display)
-                      Row(
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                      child: Column(
                         children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFF1877F2),
-                                width: 2,
-                              ),
-                            ),
-                            child: CircleAvatar(
-                              radius: 24,
-                              backgroundImage: _userAvatarUrl != null
-                                  ? NetworkImage(_userAvatarUrl!)
-                                  : null,
-                              backgroundColor: Colors.grey[200],
-                              child: _userAvatarUrl == null
-                                  ? _isLoadingUser
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : Text(
-                                            _userName?.isNotEmpty == true
-                                                ? _userName![0].toUpperCase()
-                                                : 'U',
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey,
-                                            ),
-                                          )
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Show user name and email
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          // Top Row: Back + Profile + Create Post
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Welcome back,',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              Text(
-                                _userName ?? 'User',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              if (_userEmail != null)
-                                Text(
-                                  _userEmail!,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[500],
+                              // Back button + Profile Row
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.arrow_back,
+                                      color: Colors.black,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
                                   ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFF1877F2),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 28,
+                                      backgroundImage: _userAvatarUrl != null
+                                          ? NetworkImage(_userAvatarUrl!)
+                                          : null,
+                                      backgroundColor: Colors.grey[200],
+                                      child: _userAvatarUrl == null
+                                          ? _isLoadingUser
+                                                ? const SizedBox(
+                                                    width: 24,
+                                                    height: 24,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : Text(
+                                                    _userName?.isNotEmpty ==
+                                                            true
+                                                        ? _userName![0]
+                                                              .toUpperCase()
+                                                        : 'U',
+                                                    style: const TextStyle(
+                                                      fontSize: 20,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  )
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Welcome back,',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      Text(
+                                        _userName ?? 'User',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      if (_userEmail != null)
+                                        Text(
+                                          _userEmail!,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+
+                              // Create Post Button
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF1877F2),
+                                      Color(0xFFE1306C),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.add,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const CreatePostScreen(),
+                                      ),
+                                    );
+                                  },
+                                  tooltip: 'Create Post',
+                                  padding: const EdgeInsets.all(10),
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ),
                             ],
                           ),
+                          const SizedBox(height: 20),
+
+                          // Platform Cards
+                          if (!_isLoadingPageNames)
+                            Row(
+                              children: [
+                                // Facebook Card
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF1877F2,
+                                      ).withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF1877F2,
+                                        ).withValues(alpha: 0.25),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 52,
+                                          height: 52,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                const Color(0xFF1877F2),
+                                                const Color(
+                                                  0xFF1877F2,
+                                                ).withValues(alpha: 0.8),
+                                              ],
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0xFF1877F2,
+                                                ).withValues(alpha: 0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: ClipOval(
+                                            child:
+                                                _facebookPagePicture != null &&
+                                                    _facebookPagePicture!
+                                                        .isNotEmpty
+                                                ? Image.network(
+                                                    _facebookPagePicture!,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder:
+                                                        (
+                                                          _,
+                                                          __,
+                                                          ___,
+                                                        ) => const Center(
+                                                          child: FaIcon(
+                                                            FontAwesomeIcons
+                                                                .facebook,
+                                                            size: 26,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                  )
+                                                : const Center(
+                                                    child: FaIcon(
+                                                      FontAwesomeIcons.facebook,
+                                                      size: 26,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Flexible(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Text(
+                                                'Facebook',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                              Text(
+                                                _facebookPageName ??
+                                                    'Not connected',
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF1877F2),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Instagram Card
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFFE1306C,
+                                      ).withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFFE1306C,
+                                        ).withValues(alpha: 0.25),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 52,
+                                          height: 52,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                const Color(0xFFE1306C),
+                                                const Color(
+                                                  0xFFE1306C,
+                                                ).withValues(alpha: 0.8),
+                                              ],
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0xFFE1306C,
+                                                ).withValues(alpha: 0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: ClipOval(
+                                            child:
+                                                _instagramAccountPicture !=
+                                                        null &&
+                                                    _instagramAccountPicture!
+                                                        .isNotEmpty
+                                                ? Image.network(
+                                                    _instagramAccountPicture!,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder:
+                                                        (
+                                                          _,
+                                                          __,
+                                                          ___,
+                                                        ) => const Center(
+                                                          child: FaIcon(
+                                                            FontAwesomeIcons
+                                                                .instagram,
+                                                            size: 26,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                  )
+                                                : const Center(
+                                                    child: FaIcon(
+                                                      FontAwesomeIcons
+                                                          .instagram,
+                                                      size: 26,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Flexible(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Text(
+                                                'Instagram',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                              Text(
+                                                _instagramAccountName ??
+                                                    'Not connected',
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFFE1306C),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 12),
+                          // Stats Row
+                          if (_isLoadingStats)
+                            const Center(child: CircularProgressIndicator())
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Facebook',
+                                    _formatNumber(_fbFollowers),
+                                    const Color(0xFF1877F2),
+                                    FontAwesomeIcons.facebook,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Instagram',
+                                    _formatNumber(_igFollowers),
+                                    const Color(0xFFE1306C),
+                                    FontAwesomeIcons.instagram,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Engagement',
+                                    '${_engagementRate.toStringAsFixed(1)}%',
+                                    const Color(0xFF31A24C),
+                                    Icons.trending_up,
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
-
-                      // Create Post Button
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF1877F2), Color(0xFFE1306C)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const CreatePostScreen(),
-                              ),
-                            );
-                          },
-                          tooltip: 'Create Post',
-                          padding: const EdgeInsets.all(8),
-                          constraints: const BoxConstraints(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Real Stats Row
-                  if (_isLoadingStats)
-                    const Center(child: CircularProgressIndicator())
-                  else
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildStatCard(
-                          'FB Followers',
-                          _formatNumber(_fbFollowers),
-                          const Color(0xFF1877F2),
-                        ),
-                        _buildStatCard(
-                          'IG Followers',
-                          _formatNumber(_igFollowers),
-                          const Color(0xFFE1306C),
-                        ),
-                        _buildStatCard(
-                          'Engagement',
-                          '${_engagementRate.toStringAsFixed(1)}%',
-                          const Color(0xFF31A24C),
-                        ),
-                      ],
                     ),
-                ],
+                  ),
+                ),
               ),
             ),
-
-            // Main Content
-            Expanded(child: _screens[_currentIndex]),
-          ],
-        ),
+          ];
+        },
+        body: _screens[_currentIndex],
       ),
 
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(30),
-            topRight: Radius.circular(30),
+            topLeft: Radius.circular(25),
+            topRight: Radius.circular(25),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              color: Colors.grey.withValues(alpha: 0.1),
+              blurRadius: 15,
+              offset: const Offset(0, -3),
             ),
           ],
         ),
@@ -422,15 +708,20 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
           elevation: 0,
           selectedItemColor: const Color(0xFF1877F2),
           unselectedItemColor: Colors.grey,
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+          unselectedLabelStyle: const TextStyle(fontSize: 12),
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view),
+              icon: Icon(Icons.grid_view_outlined, size: 26),
+              activeIcon: Icon(Icons.grid_view, size: 26),
               label: 'Content',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
+              icon: Icon(Icons.chat_bubble_outline, size: 26),
+              activeIcon: Icon(Icons.chat_bubble, size: 26),
               label: 'Inbox',
             ),
           ],
@@ -440,31 +731,58 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _showQuickActionsMenu,
         backgroundColor: const Color(0xFF1877F2),
-        mini: true,
-        child: const Icon(Icons.menu, size: 20),
+        mini: false,
+        child: const Icon(Icons.menu, size: 28),
         tooltip: 'Quick Actions',
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15), width: 0.5),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
-          Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

@@ -133,10 +133,10 @@ class _ContentScreenState extends State<ContentScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildFilterChip('Posts', ContentType.post),
-                      _buildFilterChip('Reels', ContentType.reel),
-                      _buildFilterChip('Stories', ContentType.story),
-                      _buildFilterChip('Mentions', ContentType.mention),
+                      _buildFilterChip('📱 Posts', ContentType.post),
+                      _buildFilterChip('🎬 Reels', ContentType.reel),
+                      _buildFilterChip('📖 Stories', ContentType.story),
+                      _buildFilterChip('🏷️ Mentions', ContentType.mention),
                     ],
                   ),
                 ),

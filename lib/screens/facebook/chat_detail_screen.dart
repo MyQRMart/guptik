@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:guptik/models/facebook/meta_chat_model.dart';
 import 'package:guptik/models/facebook/meta_content_model.dart';
 import 'package:guptik/services/facebook/meta_service.dart';
+import 'package:guptik/services/facebook/message_storage_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final MetaChat conversation;
@@ -15,62 +16,144 @@ class ChatDetailScreen extends StatefulWidget {
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final MetaService _metaService = MetaService();
+  final MessageStorageService _storageService = MessageStorageService();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  Timer? _refreshTimer;
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _loadMessages(),
-    );
+    _subscribeToNewMessages();
   }
 
   @override
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
-    _refreshTimer?.cancel();
+    _realtimeChannel?.unsubscribe();
     super.dispose();
   }
 
+  void _subscribeToNewMessages() {
+    final table = widget.conversation.platform == SocialPlatform.facebook
+        ? 'fb_messages'
+        : 'ig_messages';
+
+    _realtimeChannel = Supabase.instance.client
+        .channel('messages-${widget.conversation.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: table,
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: widget.conversation.supabaseId,
+          ),
+          callback: (payload) {
+            final newMessage = payload.newRecord;
+            final message = {
+              'id': newMessage['message_id'],
+              'message': newMessage['content'],
+              'is_from_me':
+                  newMessage['direction'] == 'outgoing' ||
+                  newMessage['direction'] == 'ai_outgoing',
+              'created_time': newMessage['timestamp'],
+              'message_id': newMessage['message_id'],
+              'content': newMessage['content'],
+              'message_type': newMessage['message_type'],
+              'direction': newMessage['direction'],
+              'timestamp': newMessage['timestamp'],
+              'media_info': newMessage['media_info'],
+              'raw_data': newMessage['raw_data'],
+            };
+
+            if (!_messages.any(
+              (m) => m['message_id'] == message['message_id'],
+            )) {
+              if (mounted) {
+                setState(() {
+                  _messages.add(message);
+                  _messages.sort((a, b) {
+                    final timeA = DateTime.parse(a['created_time']);
+                    final timeB = DateTime.parse(b['created_time']);
+                    return timeA.compareTo(timeB);
+                  });
+                });
+                _scrollToBottom();
+              }
+            }
+          },
+        )
+        .subscribe();
+  }
+
   Future<void> _loadMessages() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
     try {
-      final msgs = await _metaService.getChatMessages(
-        widget.conversation.id,
-        platform: widget.conversation.platform,
+      // Load only from Supabase – no API fallback
+      final storedMessages = await _storageService.getMessages(
+        widget.conversation.platform == SocialPlatform.facebook
+            ? 'facebook'
+            : 'instagram',
+        widget.conversation.supabaseId,
       );
 
-      if (mounted) {
-        setState(() {
-          _messages = msgs;
-          _isLoading = false;
+      if (storedMessages.isNotEmpty) {
+        _messages = storedMessages.map((msg) {
+          return {
+            'id': msg['message_id'],
+            'message': msg['content'],
+            'is_from_me':
+                msg['direction'] == 'outgoing' ||
+                msg['direction'] == 'ai_outgoing',
+            'created_time': msg['timestamp'],
+            'message_id': msg['message_id'],
+            'content': msg['content'],
+            'message_type': msg['message_type'],
+            'direction': msg['direction'],
+            'timestamp': msg['timestamp'],
+            'media_info': msg['media_info'],
+            'raw_data': msg['raw_data'],
+          };
+        }).toList();
+
+        _messages.sort((a, b) {
+          final timeA = DateTime.parse(a['created_time']);
+          final timeB = DateTime.parse(b['created_time']);
+          return timeA.compareTo(timeB);
         });
 
-        if (_messages.isNotEmpty) {
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (_scrollController.hasClients) {
-              _scrollController.animateTo(
-                0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-              );
-            }
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Error loading chat details: $e");
-      if (mounted) {
+        setState(() => _isLoading = false);
+        _scrollToBottom();
+      } else {
+        // No messages in Supabase – show empty state
         setState(() => _isLoading = false);
       }
+    } catch (e) {
+      debugPrint("Error loading messages: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _sendMessage() async {
@@ -88,50 +171,40 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     setState(() {
       _isSending = true;
-      _messages.insert(0, tempMessage);
+      _messages.add(tempMessage);
     });
-
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    _scrollToBottom();
 
     try {
-      final success = await _metaService.sendMessage(
-        widget.conversation.id,
-        messageText,
-        platform: widget.conversation.platform,
-      );
+      bool success;
+      if (widget.conversation.platform == SocialPlatform.instagram) {
+        success = await _metaService.sendInstagramMessage(
+          widget.conversation.participantId,
+          messageText,
+        );
+      } else {
+        // For Facebook, use the new sendMessage with recipientId (participantId)
+        success = await _metaService.sendMessage(
+          conversationId: widget.conversation.id,
+          recipientId: widget.conversation.participantId,
+          message: messageText,
+        );
+      }
 
       if (success && mounted) {
         setState(() {
           _messages.removeWhere((msg) => msg['is_sending'] == true);
         });
-        await _loadMessages();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Message sent'),
-            duration: const Duration(seconds: 1),
-            backgroundColor: Colors.green,
-          ),
-        );
+        await _loadMessages(); // reload to show stored outgoing message
       } else if (mounted) {
         setState(() {
           _messages.removeWhere((msg) => msg['is_sending'] == true);
         });
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send message. Please try again.'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: Colors.red,
+            content: Text('Failed to send message'),
             action: SnackBarAction(
               label: 'Retry',
-              textColor: Colors.white,
               onPressed: () {
                 _textController.text = messageText;
                 _sendMessage();
@@ -141,47 +214,33 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         );
       }
     } catch (e) {
-      debugPrint("❌ Error sending message: $e");
+      setState(() {
+        _messages.removeWhere((msg) => msg['is_sending'] == true);
+      });
       if (mounted) {
-        setState(() {
-          _messages.removeWhere((msg) => msg['is_sending'] == true);
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending message: ${e.toString()}'),
-            duration: const Duration(seconds: 3),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: () {
-                _textController.text = messageText;
-                _sendMessage();
-              },
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
+      if (mounted) setState(() => _isSending = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final platform = widget.conversation.platform;
+    final platformColor = platform == SocialPlatform.facebook
+        ? Colors.blue
+        : Colors.pink;
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor:
-                  widget.conversation.platform == SocialPlatform.facebook
-                  ? Colors.blue[100]
-                  : Colors.pink[100],
+              backgroundColor: platformColor.shade100,
               child: Text(
                 widget.conversation.senderName.isNotEmpty
                     ? widget.conversation.senderName[0].toUpperCase()
@@ -189,9 +248,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: widget.conversation.platform == SocialPlatform.facebook
-                      ? Colors.blue
-                      : Colors.pink,
+                  color: platformColor,
                 ),
               ),
             ),
@@ -207,6 +264,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -214,24 +272,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color:
-                          widget.conversation.platform ==
-                              SocialPlatform.facebook
-                          ? Colors.blue[50]
-                          : Colors.pink[50],
+                      color: platformColor.shade50,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      widget.conversation.platform == SocialPlatform.facebook
+                      platform == SocialPlatform.facebook
                           ? 'Facebook'
                           : 'Instagram',
                       style: TextStyle(
                         fontSize: 10,
-                        color:
-                            widget.conversation.platform ==
-                                SocialPlatform.facebook
-                            ? Colors.blue
-                            : Colors.pink,
+                        color: platformColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -287,7 +337,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         : ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.all(16),
-                            reverse: true,
                             itemCount: _messages.length,
                             itemBuilder: (context, index) {
                               final msg = _messages[index];
@@ -302,63 +351,67 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           ),
                   ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(blurRadius: 2, color: Colors.grey.withOpacity(0.1)),
-              ],
+          _buildMessageInput(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageInput() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(blurRadius: 2, color: Colors.grey.withValues(alpha: 0.1)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _textController,
+              enabled: !_isSending,
+              decoration: InputDecoration(
+                hintText: "Type a message...",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+              ),
+              maxLines: null,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendMessage(),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    enabled: !_isSending,
-                    decoration: InputDecoration(
-                      hintText: "Type a message...",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
+          ),
+          const SizedBox(width: 8),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: widget.conversation.platform == SocialPlatform.facebook
+                    ? [Colors.blue, Colors.blue.shade700]
+                    : [Colors.pink, Colors.pink.shade700],
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: IconButton(
+              icon: _isSending
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                    ),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1877F2), Color(0xFFE1306C)],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: IconButton(
-                    icon: _isSending
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Icon(Icons.send, color: Colors.white, size: 18),
-                    onPressed: _isSending ? null : _sendMessage,
-                  ),
-                ),
-              ],
+                    )
+                  : const Icon(Icons.send, color: Colors.white, size: 18),
+              onPressed: _isSending ? null : _sendMessage,
             ),
           ),
         ],
@@ -384,8 +437,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               radius: 12,
               backgroundColor:
                   widget.conversation.platform == SocialPlatform.facebook
-                  ? Colors.blue[100]
-                  : Colors.pink[100],
+                  ? Colors.blue.shade100
+                  : Colors.pink.shade100,
               child: Text(
                 widget.conversation.senderName.isNotEmpty
                     ? widget.conversation.senderName[0].toUpperCase()
@@ -404,7 +457,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isMe
-                    ? (isSending ? Colors.blue[100] : const Color(0xFF1877F2))
+                    ? (isSending ? Colors.blue.shade100 : Colors.blue)
                     : Colors.grey[200],
                 borderRadius: BorderRadius.circular(18).copyWith(
                   bottomRight: isMe

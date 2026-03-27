@@ -1,20 +1,36 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:guptik/models/facebook/meta_chat_model.dart';
 import 'package:guptik/models/facebook/meta_comment_model.dart';
-import 'package:guptik/models/facebook/meta_content_model.dart'; // For SocialPlatform enum
+import 'package:guptik/models/facebook/meta_content_model.dart';
 import 'package:guptik/models/facebook/meta_insights_model.dart';
 import 'package:guptik/models/facebook/meta_story_reel_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/services/facebook/message_storage_service.dart';
 
 class MetaService {
   static const String _graphApiVersion = "v24.0";
   static const String _uploadServiceUrl =
       "https://uploadservice.myqrmart.com/upload";
+  final MessageStorageService _storageService = MessageStorageService();
 
   Map<String, dynamic>? _cachedCredentials;
+
+  // ---------------------------------------------------------------------------
+  // 🔐 HELPER: Convert string to UUID (for Instagram conversation IDs)
+  // ---------------------------------------------------------------------------
+  String _stringToUuid(String input) {
+    final bytes = utf8.encode(input);
+    final digest = md5.convert(bytes);
+    return '${digest.toString().substring(0, 8)}-'
+        '${digest.toString().substring(8, 12)}-'
+        '${digest.toString().substring(12, 16)}-'
+        '${digest.toString().substring(16, 20)}-'
+        '${digest.toString().substring(20, 32)}';
+  }
 
   // ---------------------------------------------------------------------------
   // 🔐 HELPER: Fetch Credentials from Supabase
@@ -65,9 +81,7 @@ class MetaService {
     }
   }
 
-  // ---------------------------------------------------------------------------
   // Helper: Make authorized HTTP request with Bearer token
-  // ---------------------------------------------------------------------------
   Future<http.Response> _makeAuthorizedGet(
     String url,
     String accessToken,
@@ -87,70 +101,28 @@ class MetaService {
     return response;
   }
 
-  Future<http.Response> _makeAuthorizedPost(
-    String url,
-    String accessToken, {
-    Map<String, dynamic>? body,
-  }) async {
-    debugPrint("API POST Call: $url");
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      },
-      body: body != null ? jsonEncode(body) : null,
-    );
-    debugPrint("Response Status: ${response.statusCode}");
-    if (response.statusCode != 200) {
-      debugPrint("Response Error: ${response.body}");
-    }
-    return response;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helper: Upload image to your own upload service - FIXED VERSION
-  // ---------------------------------------------------------------------------
+  // Helper: Upload image to your own upload service
   Future<String> _uploadToMyService(File imageFile) async {
     try {
       var uri = Uri.parse(_uploadServiceUrl);
       var request = http.MultipartRequest('POST', uri);
-
-      // Add headers
       request.headers['Content-Type'] = 'multipart/form-data';
-
-      // Add the file with field name 'file' as per your service
       request.files.add(
         await http.MultipartFile.fromPath('file', imageFile.path),
       );
-
       debugPrint("📤 Uploading to your service: $_uploadServiceUrl");
-
-      // Send the request
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
-
       debugPrint("📨 Upload service response status: ${response.statusCode}");
       debugPrint("📨 Upload service response body: ${response.body}");
-
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-
-        // Your response is a SINGLE OBJECT, not an array!
-        // From your log: {"success":true,"file":{...}}
-
         if (data['success'] == true) {
-          // Access the URL directly from the file object
           final fileUrl = data['file']['url'];
           debugPrint("✅ Image uploaded successfully: $fileUrl");
           return fileUrl;
-        } else {
-          debugPrint("❌ Upload service returned success=false");
-          return '';
         }
       }
-
-      debugPrint("❌ Upload service error: ${response.body}");
       return '';
     } catch (e) {
       debugPrint("❌ Error uploading to your service: $e");
@@ -296,7 +268,7 @@ class MetaService {
 
     if (accessToken == null) return false;
 
-    // --- A. FACEBOOK UPLOAD (unchanged) ---
+    // --- A. FACEBOOK UPLOAD ---
     if (platform == SocialPlatform.facebook) {
       final String? pageId = creds['facebook_account_id'];
       if (pageId == null) return false;
@@ -366,14 +338,12 @@ class MetaService {
       final String? igId = creds['instagram_account_id'];
       if (igId == null) return false;
 
-      // Instagram requires an image for posting
       if (imageFile == null) {
         debugPrint("❌ IG Error: Instagram posts require an image.");
         return false;
       }
 
       try {
-        // STEP 1: Upload to YOUR OWN upload service
         final String publicUrl = await _uploadToMyService(imageFile);
 
         if (publicUrl.isEmpty) {
@@ -383,7 +353,6 @@ class MetaService {
 
         debugPrint("📤 Image uploaded to your service: $publicUrl");
 
-        // STEP 2: Create Instagram Media Container
         final containerUrl = Uri.parse(
           'https://graph.facebook.com/$_graphApiVersion/$igId/media',
         );
@@ -400,14 +369,6 @@ class MetaService {
 
         if (containerResponse.statusCode != 200) {
           debugPrint("❌ IG Container Error: ${containerResponse.body}");
-
-          // Check for specific errors
-          final errorData = json.decode(containerResponse.body);
-          if (errorData['error'] != null) {
-            final error = errorData['error'];
-            debugPrint("❌ Error code: ${error['code']}");
-            debugPrint("❌ Error message: ${error['message']}");
-          }
           return false;
         }
 
@@ -416,11 +377,8 @@ class MetaService {
 
         debugPrint("✅ Container created with ID: $creationId");
 
-        // STEP 3: Wait for media processing (recommended)
-        debugPrint("⏳ Waiting for media processing...");
         await Future.delayed(const Duration(seconds: 5));
 
-        // STEP 4: Publish Container
         final publishUrl = Uri.parse(
           'https://graph.facebook.com/$_graphApiVersion/$igId/media_publish',
         );
@@ -449,395 +407,489 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. GET UNIFIED INBOX (FB + IG Merged)
+  // 3. GET UNIFIED INBOX (FB + IG Merged) - WITH STORAGE
   // ---------------------------------------------------------------------------
   Future<List<MetaChat>> getUnifiedInbox() async {
-    final creds = await _getCredentials();
-    final String? fbPageId = creds['facebook_account_id'];
-    final String? igAccountId = creds['instagram_account_id'];
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    if (accessToken == null) return [];
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return [];
 
     List<MetaChat> allChats = [];
 
-    // Fetch FB Conversations
-    if (fbPageId != null) {
-      final fbUrl = Uri.parse(
-        'https://graph.facebook.com/$_graphApiVersion/$fbPageId/conversations?fields=id,updated_time,participants,messages.limit(1){message,from,created_time},unread_count&access_token=$accessToken',
+    // Load Facebook conversations from Supabase
+    final fbConversations = await _storageService.getUserConversations(
+      'facebook',
+      userId,
+    );
+    for (var conv in fbConversations) {
+      allChats.add(
+        MetaChat(
+          id: conv['id'],
+          supabaseId: conv['id'],
+          participantId: conv['sender_id'], // ✅ must be the PSID
+          senderName: conv['sender_username'] ?? 'Facebook User',
+          lastMessage: conv['last_message'] ?? '',
+          time: _formatTime(conv['last_message_time']),
+          rawTimestamp: conv['last_message_time'],
+          avatarUrl: conv['sender_avatar'] ?? '',
+          platform: SocialPlatform.facebook,
+          isUnread: (conv['unread_count'] ?? 0) > 0,
+        ),
       );
-      try {
-        debugPrint("📥 Fetching Facebook inbox from: $fbUrl");
-        final fbResponse = await http.get(fbUrl);
-        debugPrint("📨 FB Response status: ${fbResponse.statusCode}");
-
-        if (fbResponse.statusCode == 200) {
-          final fbData = json.decode(fbResponse.body);
-          if (fbData.containsKey('data')) {
-            final List<dynamic> fbConvos = fbData['data'];
-            debugPrint("✅ Found ${fbConvos.length} Facebook conversations");
-
-            for (var conv in fbConvos) {
-              allChats.add(
-                _mapConversationToChat(conv, SocialPlatform.facebook),
-              );
-            }
-          }
-        } else {
-          debugPrint("❌ FB Inbox Error: ${fbResponse.body}");
-        }
-      } catch (e) {
-        debugPrint("❌ FB Inbox Exception: $e");
-      }
     }
 
-    // Fetch IG Conversations
-    if (igAccountId != null) {
-      try {
-        final igUrl = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$igAccountId/conversations?platform=instagram&fields=id,updated_time,participants{id,username,name},messages.limit(1){id,text,from,created_time,timestamp},unread_count&access_token=$accessToken',
-        );
-
-        debugPrint("📥 Fetching Instagram inbox from: $igUrl");
-        final igResponse = await http.get(igUrl);
-        debugPrint("📨 IG Response status: ${igResponse.statusCode}");
-
-        if (igResponse.statusCode == 200) {
-          final igData = json.decode(igResponse.body);
-          if (igData.containsKey('data')) {
-            final List<dynamic> igConvos = igData['data'];
-            debugPrint("✅ Found ${igConvos.length} Instagram conversations");
-
-            for (var conv in igConvos) {
-              allChats.add(
-                _mapConversationToChat(conv, SocialPlatform.instagram),
-              );
-            }
-          } else {
-            debugPrint("⚠️ No 'data' field in IG response: ${igData.keys}");
-          }
-        } else {
-          debugPrint("❌ IG Inbox Error: ${igResponse.body}");
-        }
-      } catch (e) {
-        debugPrint("❌ IG Inbox Exception: $e");
-      }
+    // Load Instagram conversations from Supabase
+    final igConversations = await _storageService.getUserConversations(
+      'instagram',
+      userId,
+    );
+    for (var conv in igConversations) {
+      // For Instagram, the stored id is the UUID, but we need the original ID for API calls.
+      // However, we are not using the API anymore, so we can use the UUID as both.
+      // But the original ID is not stored, so we'll just use the UUID.
+      allChats.add(
+        MetaChat(
+          id: conv['id'], // UUID
+          supabaseId: conv['id'], // same
+          participantId: conv['sender_id'] ?? '',
+          senderName:
+              'Instagram User', // we don't store sender_username in ig_conversations
+          lastMessage: conv['last_message'] ?? '',
+          time: _formatTime(conv['last_message_time']),
+          rawTimestamp: conv['last_message_time'],
+          avatarUrl: '', // not stored
+          platform: SocialPlatform.instagram,
+          isUnread: conv['is_unread'] ?? false,
+        ),
+      );
     }
 
-    // Sort all chats by timestamp
+    // Sort by last_message_time descending
     allChats.sort((a, b) {
       DateTime? timeA = _parseIsoTime(a.rawTimestamp);
       DateTime? timeB = _parseIsoTime(b.rawTimestamp);
+      if (timeA == null && timeB == null) return 0;
       if (timeA == null) return 1;
       if (timeB == null) return -1;
       return timeB.compareTo(timeA);
     });
-
-    debugPrint("📊 Total unified inbox count: ${allChats.length}");
+    debugPrint(
+      "Inbox loaded conversation IDs: ${allChats.map((c) => '${c.id} (${c.senderName})').toList()}",
+    );
     return allChats;
   }
 
   // ---------------------------------------------------------------------------
-  // 4. GET SPECIFIC CHAT MESSAGES
+  // 4. GET INSTAGRAM MESSAGES - WITH STORAGE
   // ---------------------------------------------------------------------------
-  Future<List<Map<String, dynamic>>> getChatMessages(
-    String conversationId, {
-    SocialPlatform? platform,
-  }) async {
+  Future<List<Map<String, dynamic>>> getInstagramMessages(
+    String conversationId,
+  ) async {
     final creds = await _getCredentials();
     final String? accessToken =
         creds['facebook_page_access_token'] ??
         creds['facebook_user_access_token'];
+    final myIgId = creds['instagram_account_id'];
 
     if (accessToken == null) return [];
 
-    final bool isInstagram =
-        platform == SocialPlatform.instagram ||
-        conversationId.startsWith('ig_') ||
-        conversationId.contains('instagram');
-
     try {
-      if (isInstagram) {
-        final url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$conversationId/messages?fields=text,from,created_time,timestamp,attachments,media,sticker,reactions&limit=50&access_token=$accessToken',
-        );
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$conversationId/messages'
+        '?fields=id,message,text,from,created_time,timestamp,attachments'
+        '&limit=50'
+        '&access_token=$accessToken',
+      );
 
-        debugPrint("📥 Fetching Instagram messages from: $url");
-        final response = await http.get(url);
+      final response = await http.get(url);
 
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final List<dynamic> rawMsgs = data['data'] ?? [];
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> rawMsgs = data['data'] ?? [];
 
-          debugPrint("✅ Found ${rawMsgs.length} Instagram messages");
+        List<Map<String, dynamic>> messages = [];
 
-          return rawMsgs.map((m) {
-            final isFromMe = m['from']?['id'] == creds['instagram_account_id'];
+        final uuidConversationId = _stringToUuid(conversationId);
 
-            String messageContent = '';
+        for (var m in rawMsgs) {
+          final senderId = m['from']?['id'];
+          final isFromMe = senderId == myIgId;
 
-            if (m['text'] != null && m['text'].isNotEmpty) {
-              messageContent = m['text'];
-            } else if (m['message'] != null && m['message'].isNotEmpty) {
-              messageContent = m['message'];
-            } else if (m['sticker'] != null) {
-              messageContent = '📱 Sticker';
-            } else if (m['media'] != null) {
-              final mediaType = m['media']['media_type'] ?? 'media';
-              if (mediaType == 'image') {
-                messageContent = '📷 Photo';
-              } else if (mediaType == 'video') {
-                messageContent = '🎥 Video';
-              } else if (mediaType == 'audio') {
-                messageContent = '🎵 Audio';
-              } else {
-                messageContent = '📎 Media';
-              }
-            } else if (m['attachments'] != null) {
-              final attachments = m['attachments']['data'] ?? [];
-              if (attachments.isNotEmpty) {
-                final attachment = attachments[0];
-                final attachmentType = attachment['type'] ?? 'attachment';
+          String messageContent = '';
+          if (m['message'] != null && m['message'].isNotEmpty) {
+            messageContent = m['message'];
+          } else if (m['text'] != null && m['text'].isNotEmpty) {
+            messageContent = m['text'];
+          } else if (m['attachments'] != null) {
+            messageContent = '📎 Attachment';
+          }
 
-                if (attachmentType == 'image') {
-                  messageContent = '📷 Photo';
-                } else if (attachmentType == 'video') {
-                  messageContent = '🎥 Video';
-                } else if (attachmentType == 'audio') {
-                  messageContent = '🎵 Audio';
-                } else if (attachmentType == 'file') {
-                  messageContent = '📎 File';
-                } else {
-                  messageContent = '📎 Attachment';
-                }
-              } else {
-                messageContent = '📎 Attachment';
-              }
-            } else if (m['reactions'] != null) {
-              messageContent = '👍 Reacted to a message';
-            } else {
-              messageContent = '💬 Message';
-            }
+          final message = {
+            'id': m['id'],
+            'message': messageContent,
+            'is_from_me': isFromMe,
+            'created_time':
+                m['created_time'] ??
+                m['timestamp'] ??
+                DateTime.now().toIso8601String(),
+            'message_id': m['id'],
+            'content': messageContent,
+            'message_type': m['attachments'] != null ? 'attachment' : 'text',
+            'direction': isFromMe ? 'outgoing' : 'incoming',
+            'timestamp': m['created_time'] ?? m['timestamp'],
+            'media_info': m['attachments'],
+            'raw_data': m,
+          };
 
-            return {
-              'message': messageContent,
-              'is_from_me': isFromMe,
-              'created_time':
-                  m['created_time'] ??
-                  m['timestamp'] ??
-                  DateTime.now().toIso8601String(),
-              'has_attachment':
-                  m['attachments'] != null ||
-                  m['media'] != null ||
-                  m['sticker'] != null,
-            };
-          }).toList();
-        } else {
-          debugPrint("❌ Instagram messages error: ${response.body}");
+          messages.add(message);
+
+          await _storageService.saveMessage(
+            platform: 'instagram',
+            conversationId: uuidConversationId,
+            messageId: m['id'],
+            content: messageContent,
+            messageType: m['attachments'] != null ? 'attachment' : 'text',
+            direction: isFromMe ? 'outgoing' : 'incoming',
+            timestamp:
+                m['created_time'] ??
+                m['timestamp'] ??
+                DateTime.now().toIso8601String(),
+            mediaInfo: m['attachments'],
+            rawData: m,
+          );
         }
-      } else {
-        final url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$conversationId/messages?fields=message,from,created_time,attachments,sticker&limit=50&access_token=$accessToken',
-        );
 
-        debugPrint("📥 Fetching Facebook messages from: $url");
-        final response = await http.get(url);
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final List<dynamic> rawMsgs = data['data'] ?? [];
-
-          debugPrint("✅ Found ${rawMsgs.length} Facebook messages");
-
-          return rawMsgs.map((m) {
-            final isFromMe = m['from']?['id'] == creds['facebook_account_id'];
-
-            String messageContent = '';
-
-            if (m['message'] != null && m['message'].isNotEmpty) {
-              messageContent = m['message'];
-            } else if (m['sticker'] != null) {
-              messageContent = '😊 Sticker';
-            } else if (m['attachments'] != null) {
-              messageContent = '📎 Attachment';
-            } else {
-              messageContent = '💬 Message';
-            }
-
-            return {
-              'message': messageContent,
-              'is_from_me': isFromMe,
-              'created_time': m['created_time'],
-              'has_attachment':
-                  m['attachments'] != null || m['sticker'] != null,
-            };
-          }).toList();
-        } else {
-          debugPrint("❌ Facebook messages error: ${response.body}");
+        // Update conversation with latest message
+        if (messages.isNotEmpty) {
+          final latestMsg = messages.last;
+          final userId = Supabase.instance.client.auth.currentUser?.id;
+          if (userId != null) {
+            await _storageService.saveConversation(
+              platform: 'instagram',
+              conversationId: uuidConversationId,
+              participantId: '',
+              participantName: '',
+              participantAvatar: '',
+              lastMessage: latestMsg['content'] ?? '',
+              lastMessageTime:
+                  latestMsg['timestamp'] ?? DateTime.now().toIso8601String(),
+              unreadCount: 0,
+              userId: userId,
+            );
+          }
         }
+
+        return messages;
       }
     } catch (e) {
-      debugPrint("❌ Error loading chat details: $e");
+      debugPrint("❌ Error loading Instagram messages: $e");
     }
     return [];
   }
 
   // ---------------------------------------------------------------------------
-  // 5. SEND MESSAGE
+  // 5. GET FACEBOOK MESSAGES - WITH STORAGE
   // ---------------------------------------------------------------------------
-  Future<bool> sendMessage(
+  Future<List<Map<String, dynamic>>> getChatMessages(
     String conversationId,
-    String message, {
-    SocialPlatform? platform,
+  ) async {
+    final creds = await _getCredentials();
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+    final myPageId = creds['facebook_account_id'];
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    debugPrint("🔍 [FB MSG] Starting getChatMessages");
+    debugPrint("🔍 [FB MSG] Conversation ID: $conversationId");
+    debugPrint("🔍 [FB MSG] My Page ID: $myPageId");
+    debugPrint("🔍 [FB MSG] User ID: $userId");
+
+    if (accessToken == null || userId == null) {
+      debugPrint("❌ [FB MSG] Missing access token or user ID");
+      return [];
+    }
+
+    try {
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$conversationId/messages'
+        '?fields=message,from,created_time,attachments,sticker'
+        '&limit=50'
+        '&access_token=$accessToken',
+      );
+
+      debugPrint("📥 [FB MSG] Fetching from: $url");
+      final response = await http.get(url);
+      debugPrint("📥 [FB MSG] Response status: ${response.statusCode}");
+
+      if (response.statusCode != 200) {
+        debugPrint("❌ [FB MSG] Error response: ${response.body}");
+        return [];
+      }
+
+      final data = json.decode(response.body);
+      final List<dynamic> rawMsgs = data['data'] ?? [];
+
+      debugPrint("✅ [FB MSG] Found ${rawMsgs.length} messages");
+
+      if (rawMsgs.isEmpty) {
+        debugPrint("ℹ️ [FB MSG] No messages found");
+        return [];
+      }
+
+      // Get conversation details
+      String participantName = 'User';
+      String participantId = '';
+
+      try {
+        final convUrl = Uri.parse(
+          'https://graph.facebook.com/$_graphApiVersion/$conversationId?fields=participants,updated_time&access_token=$accessToken',
+        );
+        debugPrint("🔍 [FB MSG] Fetching conversation details from: $convUrl");
+
+        final convResponse = await http.get(convUrl);
+        debugPrint(
+          "🔍 [FB MSG] Conversation response status: ${convResponse.statusCode}",
+        );
+
+        if (convResponse.statusCode == 200) {
+          final convData = json.decode(convResponse.body);
+          debugPrint("🔍 [FB MSG] Conversation data: $convData");
+
+          final participants = convData['participants']?['data'] ?? [];
+          debugPrint("🔍 [FB MSG] Participants count: ${participants.length}");
+
+          for (var p in participants) {
+            debugPrint("🔍 [FB MSG] Participant: ${p['id']} - ${p['name']}");
+            if (p['id'] != myPageId) {
+              participantName = p['name'] ?? p['username'] ?? 'User';
+              participantId = p['id'] ?? '';
+              debugPrint(
+                "✅ [FB MSG] Selected participant: $participantName ($participantId)",
+              );
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("❌ [FB MSG] Error fetching conversation details: $e");
+      }
+
+      List<Map<String, dynamic>> messages = [];
+
+      for (var m in rawMsgs) {
+        final senderId = m['from']?['id'];
+        final isFromMe = senderId == myPageId;
+
+        String messageContent = '';
+        String messageType = 'text';
+
+        if (m['message'] != null && m['message'].isNotEmpty) {
+          messageContent = m['message'];
+        } else if (m['sticker'] != null) {
+          messageContent = '😊 Sticker';
+          messageType = 'sticker';
+        } else if (m['attachments'] != null) {
+          messageContent = '📎 Attachment';
+          messageType = 'attachment';
+        }
+
+        final message = {
+          'id': m['id'],
+          'message': messageContent,
+          'is_from_me': isFromMe,
+          'created_time': m['created_time'],
+          'message_id': m['id'],
+          'content': messageContent,
+          'message_type': messageType,
+          'direction': isFromMe ? 'outgoing' : 'incoming',
+          'timestamp': m['created_time'],
+          'media_info': m['attachments'],
+          'raw_data': m,
+        };
+
+        messages.add(message);
+
+        debugPrint("💾 [FB MSG] Attempting to save message: ${m['id']}");
+        try {
+          await _storageService.saveMessage(
+            platform: 'facebook',
+            conversationId: conversationId,
+            messageId: m['id'],
+            content: messageContent,
+            messageType: messageType,
+            direction: isFromMe ? 'outgoing' : 'incoming',
+            timestamp: m['created_time'],
+            mediaInfo: m['attachments'],
+            rawData: m,
+          );
+          debugPrint("✅ [FB MSG] Save completed for message: ${m['id']}");
+        } catch (e) {
+          debugPrint("❌ [FB MSG] Save failed for message: ${m['id']} - $e");
+        }
+      }
+
+      // Update conversation with latest message
+      if (messages.isNotEmpty) {
+        final Map<String, dynamic> latestMsg = messages.last;
+        debugPrint("💾 [FB MSG] Updating conversation with latest message");
+        debugPrint("💾 [FB MSG] Latest message: ${latestMsg['content']}");
+
+        try {
+          await _storageService.saveConversation(
+            platform: 'facebook',
+            conversationId: conversationId,
+            participantId: participantId,
+            participantName: participantName ?? 'User',
+            participantAvatar: '',
+            lastMessage: latestMsg['content'] ?? '',
+            lastMessageTime:
+                latestMsg['timestamp'] ?? DateTime.now().toIso8601String(),
+            unreadCount: 0,
+            userId: userId,
+          );
+          debugPrint("✅ [FB MSG] Conversation updated successfully");
+        } catch (e) {
+          debugPrint("❌ [FB MSG] Conversation update failed: $e");
+        }
+      }
+
+      debugPrint("✅ [FB MSG] Returning ${messages.length} messages");
+      return messages;
+    } catch (e) {
+      debugPrint("❌ [FB MSG] Fatal error: $e");
+      return [];
+    }
+  }
+  // Helper to determine Facebook message type
+
+  // ---------------------------------------------------------------------------
+  // 6. SEND INSTAGRAM MESSAGE - WITH STORAGE
+  // ---------------------------------------------------------------------------
+  Future<bool> sendInstagramMessage(
+    String participantId,
+    String message,
+  ) async {
+    final creds = await _getCredentials();
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
+    if (accessToken == null) return false;
+
+    try {
+      final sendUrl = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/me/messages',
+      );
+
+      final response = await http.post(
+        sendUrl,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'recipient': {'id': participantId},
+          'message': {'text': message},
+          'access_token': accessToken,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final messageId =
+            data['message_id'] ??
+            DateTime.now().millisecondsSinceEpoch.toString();
+
+        // Save outgoing message to Supabase
+        await _storageService.saveMessage(
+          platform: 'instagram',
+          conversationId: participantId, // This is the conversation ID
+          messageId: messageId,
+          content: message,
+          messageType: 'text',
+          direction: 'outgoing',
+          timestamp: DateTime.now().toIso8601String(),
+        );
+
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint("❌ Send Exception: $e");
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 7. SEND FACEBOOK MESSAGE - WITH STORAGE
+  // ---------------------------------------------------------------------------
+  Future<bool> sendMessage({
+    required String conversationId,
+    required String recipientId,
+    required String message,
   }) async {
     final creds = await _getCredentials();
     final String? accessToken =
         creds['facebook_page_access_token'] ??
         creds['facebook_user_access_token'];
-    final String? pageId = creds['facebook_account_id'];
-    final String? igId = creds['instagram_account_id'];
+    final userId = Supabase.instance.client.auth.currentUser?.id;
 
-    if (accessToken == null) {
-      debugPrint("❌ No access token available");
+    if (accessToken == null || userId == null) {
+      debugPrint("❌ Missing access token or user ID");
       return false;
     }
 
-    final bool isInstagram =
-        platform == SocialPlatform.instagram ||
-        conversationId.startsWith('ig_') ||
-        conversationId.contains('instagram');
-
     try {
-      if (isInstagram) {
-        debugPrint(
-          "🔍 Fetching Instagram conversation details for: $conversationId",
+      debugPrint("🔍 Sending message to recipient: $recipientId");
+
+      final sendUrl = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/me/messages',
+      );
+      final payload = {
+        'recipient': {'id': recipientId},
+        'message': {'text': message},
+        'access_token': accessToken,
+      };
+      debugPrint("📤 Sending payload: $payload");
+      final response = await http.post(
+        sendUrl,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(payload),
+      );
+
+      debugPrint("📨 Send response status: ${response.statusCode}");
+      debugPrint("📨 Send response body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final messageId =
+            data['message_id'] ??
+            DateTime.now().millisecondsSinceEpoch.toString();
+        final timestamp = DateTime.now().toIso8601String();
+
+        await _storageService.saveMessage(
+          platform: 'facebook',
+          conversationId: conversationId,
+          messageId: messageId,
+          content: message,
+          messageType: 'text',
+          direction: 'outgoing',
+          timestamp: timestamp,
         );
 
-        final conversationUrl = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$conversationId?fields=participants{id}&access_token=$accessToken',
+        await _storageService.saveConversation(
+          platform: 'facebook',
+          conversationId: conversationId,
+          participantId: recipientId, // recipientId is the PSID
+          participantName: '', // not needed here
+          lastMessage: message,
+          lastMessageTime: timestamp,
+          unreadCount: 0,
+          userId: userId,
         );
 
-        final conversationResponse = await http.get(conversationUrl);
-
-        if (conversationResponse.statusCode != 200) {
-          debugPrint(
-            "❌ Failed to fetch conversation: ${conversationResponse.body}",
-          );
-          return false;
-        }
-
-        final conversationData = json.decode(conversationResponse.body);
-
-        final participants = conversationData['participants']?['data'] ?? [];
-
-        if (participants.isEmpty) {
-          debugPrint("❌ No participants found in conversation");
-          return false;
-        }
-
-        String? recipientId;
-
-        for (var participant in participants) {
-          final participantId = participant['id'];
-          if (participantId != igId) {
-            recipientId = participantId;
-            break;
-          }
-        }
-
-        recipientId ??= participants.first['id'];
-
-        debugPrint("✅ Found Instagram recipient ID: $recipientId");
-
-        final sendUrl = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/me/messages',
-        );
-
-        debugPrint("📤 Sending Instagram message to recipient: $recipientId");
-        debugPrint("📤 Message content: $message");
-
-        final response = await http.post(
-          sendUrl,
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'recipient': {'id': recipientId},
-            'message': {'text': message},
-            'access_token': accessToken,
-          }),
-        );
-
-        debugPrint("📨 Response status: ${response.statusCode}");
-        debugPrint("📨 Response body: ${response.body}");
-
-        return response.statusCode == 200;
+        debugPrint("✅ Message sent and stored successfully");
+        return true;
       } else {
-        if (pageId == null) {
-          debugPrint("❌ No page ID available");
-          return false;
-        }
-
-        debugPrint(
-          "🔍 Fetching Facebook conversation details for: $conversationId",
-        );
-
-        final conversationUrl = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$conversationId?fields=participants,id&access_token=$accessToken',
-        );
-
-        final conversationResponse = await http.get(conversationUrl);
-
-        if (conversationResponse.statusCode != 200) {
-          debugPrint(
-            "❌ Failed to fetch conversation: ${conversationResponse.body}",
-          );
-          return false;
-        }
-
-        final conversationData = json.decode(conversationResponse.body);
-
-        final participants = conversationData['participants']?['data'] ?? [];
-
-        if (participants.isEmpty) {
-          debugPrint("❌ No participants found in conversation");
-          return false;
-        }
-
-        String? recipientId;
-
-        for (var participant in participants) {
-          final participantId = participant['id'];
-          if (participantId != pageId) {
-            recipientId = participantId;
-            break;
-          }
-        }
-
-        recipientId ??= participants.first['id'];
-
-        debugPrint("✅ Found Facebook recipient ID: $recipientId");
-
-        final sendUrl = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/me/messages',
-        );
-
-        debugPrint("📤 Sending Facebook message to recipient: $recipientId");
-
-        final response = await http.post(
-          sendUrl,
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'recipient': {'id': recipientId},
-            'message': {'text': message},
-            'access_token': accessToken,
-          }),
-        );
-
-        debugPrint("📨 Response status: ${response.statusCode}");
-        debugPrint("📨 Response body: ${response.body}");
-
-        return response.statusCode == 200;
+        debugPrint("❌ Graph API error: ${response.body}");
+        return false;
       }
     } catch (e) {
       debugPrint("❌ Send Exception: $e");
@@ -846,136 +898,8 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 🛠️ HELPERS
+  // 10. HELPERS
   // ---------------------------------------------------------------------------
-  MetaChat _mapConversationToChat(dynamic conv, SocialPlatform platform) {
-    if (platform == SocialPlatform.instagram) {
-      final messages = conv['messages']?['data'] ?? [];
-      final lastMsgData = messages.isNotEmpty ? messages[0] : null;
-
-      String messageText = 'Attachment sent';
-
-      if (lastMsgData != null) {
-        if (lastMsgData['text'] != null && lastMsgData['text'].isNotEmpty) {
-          messageText = lastMsgData['text'];
-        } else if (lastMsgData['message'] != null &&
-            lastMsgData['message'].isNotEmpty) {
-          messageText = lastMsgData['message'];
-        } else if (lastMsgData['sticker'] != null) {
-          messageText = '📱 Sticker';
-        } else if (lastMsgData['media'] != null) {
-          final mediaType = lastMsgData['media']['media_type'] ?? 'media';
-          if (mediaType == 'image') {
-            messageText = '📷 Photo';
-          } else if (mediaType == 'video') {
-            messageText = '🎥 Video';
-          } else if (mediaType == 'audio') {
-            messageText = '🎵 Audio';
-          } else {
-            messageText = '📎 Media attachment';
-          }
-        } else if (lastMsgData['attachments'] != null) {
-          final attachments = lastMsgData['attachments']['data'] ?? [];
-          if (attachments.isNotEmpty) {
-            final attachment = attachments[0];
-            final attachmentType = attachment['type'] ?? 'attachment';
-
-            if (attachmentType == 'image') {
-              messageText = '📷 Photo';
-            } else if (attachmentType == 'video') {
-              messageText = '🎥 Video';
-            } else if (attachmentType == 'audio') {
-              messageText = '🎵 Audio';
-            } else if (attachmentType == 'file') {
-              messageText = '📎 File';
-            } else {
-              messageText = '📎 Attachment';
-            }
-          }
-        } else if (lastMsgData['reaction'] != null) {
-          messageText = '👍 Reacted to a message';
-        }
-      }
-
-      String senderName = 'Instagram User';
-      String? avatarUrl;
-
-      final participants = conv['participants']?['data'] ?? [];
-      if (participants.isNotEmpty) {
-        final igId = _cachedCredentials?['instagram_account_id'];
-        for (var p in participants) {
-          if (p['id'] != igId) {
-            senderName = p['username'] ?? p['name'] ?? 'Instagram User';
-            avatarUrl = p['profile_pic'] ?? '';
-            break;
-          }
-        }
-      }
-
-      final String rawTime =
-          lastMsgData?['created_time'] ??
-          lastMsgData?['timestamp'] ??
-          conv['updated_time'] ??
-          DateTime.now().toIso8601String();
-      final String displayTime = _formatTime(rawTime);
-
-      return MetaChat(
-        id: conv['id'],
-        senderName: senderName,
-        lastMessage: messageText,
-        time: displayTime,
-        rawTimestamp: rawTime,
-        avatarUrl: avatarUrl ?? '',
-        platform: platform,
-        isUnread: (conv['unread_count'] ?? 0) > 0,
-      );
-    } else {
-      final lastMsgData = conv['messages']?['data']?[0];
-
-      String messageText = 'Attachment sent';
-      if (lastMsgData != null) {
-        if (lastMsgData['message'] != null &&
-            lastMsgData['message'].isNotEmpty) {
-          messageText = lastMsgData['message'];
-        } else if (lastMsgData['attachments'] != null) {
-          messageText = '📎 Attachment';
-        } else if (lastMsgData['sticker'] != null) {
-          messageText = '😊 Sticker';
-        }
-      }
-
-      final participants = conv['participants']?['data'] ?? [];
-      String senderName = 'User';
-      String? avatarUrl;
-
-      if (participants.isNotEmpty) {
-        final pageId = _cachedCredentials?['facebook_account_id'];
-        for (var p in participants) {
-          if (p['id'] != pageId) {
-            senderName = p['name'] ?? p['username'] ?? 'User';
-            avatarUrl = p['profile_pic'] ?? '';
-            break;
-          }
-        }
-      }
-
-      final String rawTime =
-          lastMsgData?['created_time'] ?? conv['updated_time'];
-      final String displayTime = _formatTime(rawTime);
-
-      return MetaChat(
-        id: conv['id'],
-        senderName: senderName,
-        lastMessage: messageText,
-        time: displayTime,
-        rawTimestamp: rawTime,
-        avatarUrl: avatarUrl ?? '',
-        platform: platform,
-        isUnread: (conv['unread_count'] ?? 0) > 0,
-      );
-    }
-  }
-
   DateTime? _parseIsoTime(String? isoTime) {
     if (isoTime == null) return null;
     return DateTime.tryParse(isoTime);
@@ -1003,7 +927,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 6. DELETE POST
+  // 11. DELETE POST
   // ---------------------------------------------------------------------------
   Future<bool> deletePost(String postId, SocialPlatform platform) async {
     final creds = await _getCredentials();
@@ -1034,7 +958,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 7. EDIT POST
+  // 12. EDIT POST
   // ---------------------------------------------------------------------------
   Future<bool> editPost(
     String postId,
@@ -1100,7 +1024,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 8. GET POST COMMENTS
+  // 13. GET POST COMMENTS
   // ---------------------------------------------------------------------------
   Future<List<MetaComment>> getPostComments(
     String postId, {
@@ -1121,15 +1045,12 @@ class MetaService {
 
     try {
       if (isInstagram) {
-        // Updated URL to properly fetch replies
         final url = Uri.parse(
           'https://graph.facebook.com/$_graphApiVersion/$postId/comments'
-          '?fields=id,text,username,timestamp,like_count,'
-          'replies{id,text,username,timestamp,like_count}&' // Fetch replies properly
-          'limit=50&access_token=$accessToken',
+          '?fields=id,text,username,timestamp,like_count,replies{id,text,username,timestamp,like_count}'
+          '&limit=50&access_token=$accessToken',
         );
 
-        debugPrint("Fetching Instagram comments from: $url");
         final response = await http.get(url);
 
         if (response.statusCode == 200) {
@@ -1137,8 +1058,6 @@ class MetaService {
           if (!data.containsKey('data')) return [];
 
           final List<dynamic> comments = data['data'];
-          debugPrint("Found ${comments.length} Instagram comments");
-
           return comments.map((comment) {
             List<MetaComment> replies = [];
             if (comment.containsKey('replies') &&
@@ -1174,48 +1093,15 @@ class MetaService {
               replies: replies,
             );
           }).toList();
-        } else {
-          debugPrint("Instagram comments error: ${response.body}");
-
-          final altUrl = Uri.parse(
-            'https://graph.instagram.com/$postId/comments'
-            '?fields=id,text,username,timestamp&'
-            'limit=50&access_token=$accessToken',
-          );
-
-          debugPrint("Trying alternative Instagram API: $altUrl");
-          final altResponse = await http.get(altUrl);
-
-          if (altResponse.statusCode == 200) {
-            final altData = json.decode(altResponse.body);
-            if (!altData.containsKey('data')) return [];
-
-            final List<dynamic> altComments = altData['data'];
-            return altComments.map((comment) {
-              return MetaComment(
-                id: comment['id'] ?? '',
-                authorName: comment['username'] ?? 'Instagram User',
-                authorId: comment['id'] ?? '',
-                text: comment['text'] ?? '',
-                createdTime:
-                    comment['timestamp'] ?? DateTime.now().toIso8601String(),
-                likeCount: 0,
-                platform: SocialPlatform.instagram,
-                isFromPageOwner: false,
-                replies: [],
-              );
-            }).toList();
-          }
         }
       } else {
         final url = Uri.parse(
           'https://graph.facebook.com/$_graphApiVersion/$postId/comments'
           '?fields=id,message,from{id,name,picture},created_time,like_count,'
-          'comments{id,message,from{id,name,picture},created_time,like_count}&'
-          'limit=50&access_token=$accessToken',
+          'comments{id,message,from{id,name,picture},created_time,like_count}'
+          '&limit=50&access_token=$accessToken',
         );
 
-        debugPrint("Fetching Facebook comments from: $url");
         final response = await http.get(url);
 
         if (response.statusCode == 200) {
@@ -1223,8 +1109,6 @@ class MetaService {
           if (!data.containsKey('data')) return [];
 
           final List<dynamic> comments = data['data'];
-          debugPrint("Found ${comments.length} Facebook comments");
-
           return comments.map((comment) {
             List<MetaComment> replies = [];
             if (comment.containsKey('comments') &&
@@ -1267,7 +1151,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 9. REPLY TO COMMENT - COMPLETE FIX for both Facebook and Instagram
+  // 14. REPLY TO COMMENT
   // ---------------------------------------------------------------------------
   Future<bool> replyToComment(String commentId, String replyText) async {
     final creds = await _getCredentials();
@@ -1277,84 +1161,30 @@ class MetaService {
 
     if (accessToken == null) return false;
 
-    // DETERMINE PLATFORM BASED ON COMMENT ID PATTERN
-    // Instagram comment IDs typically:
-    // - Start with 178, 179, 180, 181
-    // - Are 17-18 digits long
-    // Facebook comment IDs are usually shorter or have different patterns
-
     final bool isInstagram =
-        commentId.length >= 17 &&
-        (commentId.startsWith('178') ||
-            commentId.startsWith('179') ||
-            commentId.startsWith('180') ||
-            commentId.startsWith('181'));
-
-    debugPrint("🔍 Comment ID: $commentId");
-    debugPrint(
-      "🔍 Platform detected: ${isInstagram ? 'Instagram' : 'Facebook'}",
-    );
+        commentId.startsWith('178') ||
+        commentId.startsWith('179') ||
+        commentId.startsWith('180') ||
+        commentId.startsWith('181');
 
     try {
-      late Uri url;
-      late Map<String, dynamic> requestBody;
-
-      if (isInstagram) {
-        // INSTAGRAM: Use the replies endpoint
-        // Instagram requires the 'replies' endpoint for comment replies
-        url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$commentId/replies',
-        );
-
-        requestBody = {'message': replyText, 'access_token': accessToken};
-
-        debugPrint("📝 Replying to Instagram comment using: $url");
-      } else {
-        // FACEBOOK: Use the comments endpoint
-        url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$commentId/comments',
-        );
-
-        requestBody = {'message': replyText, 'access_token': accessToken};
-
-        debugPrint("📝 Replying to Facebook comment using: $url");
-      }
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$commentId/${isInstagram ? 'replies' : 'comments'}',
+      );
 
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode(requestBody),
+        body: json.encode({'message': replyText, 'access_token': accessToken}),
       );
 
-      debugPrint("📨 Reply Response status: ${response.statusCode}");
-      debugPrint("📨 Reply Response body: ${response.body}");
-
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['id'] != null) {
-          debugPrint("✅ Reply added successfully with ID: ${data['id']}");
-          return true;
-        } else if (data['success'] == true) {
-          debugPrint("✅ Reply added successfully");
-          return true;
-        }
+        debugPrint("✅ Reply added successfully");
+        return true;
       } else {
-        // Log detailed error information
-        final errorData = json.decode(response.body);
-        if (errorData['error'] != null) {
-          debugPrint("❌ Error code: ${errorData['error']['code']}");
-          debugPrint("❌ Error subcode: ${errorData['error']['error_subcode']}");
-          debugPrint("❌ Error message: ${errorData['error']['message']}");
-
-          // Specific handling for Instagram permission issues
-          if (errorData['error']['error_subcode'] == 33) {
-            debugPrint(
-              "❌ This is an Instagram comment - make sure you have instagram_business_manage_comments permission",
-            );
-          }
-        }
+        debugPrint("❌ Reply Error (${response.statusCode}): ${response.body}");
+        return false;
       }
-      return false;
     } catch (e) {
       debugPrint("❌ Reply Exception: $e");
       return false;
@@ -1362,7 +1192,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 10. DELETE COMMENT
+  // 15. DELETE COMMENT
   // ---------------------------------------------------------------------------
   Future<bool> deleteComment(String commentId) async {
     final creds = await _getCredentials();
@@ -1393,7 +1223,99 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 11. GET PAGE INSIGHTS
+  // 28. POST COMMENT
+  // ---------------------------------------------------------------------------
+  Future<bool> postComment(
+    String postId,
+    String commentText, {
+    SocialPlatform? platform,
+  }) async {
+    final creds = await _getCredentials();
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
+    if (accessToken == null) return false;
+
+    final bool isInstagram =
+        platform == SocialPlatform.instagram ||
+        postId.startsWith('178') ||
+        postId.startsWith('179');
+
+    try {
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$postId/${isInstagram ? 'comments' : 'comments'}',
+      );
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'message': commentText,
+          'access_token': accessToken,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint("✅ Comment posted successfully");
+        return true;
+      } else {
+        debugPrint("❌ Comment error: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("❌ Comment exception: $e");
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 16. GET AUDIENCE DEMOGRAPHICS
+  // ---------------------------------------------------------------------------
+  Future<List<MetaAudienceDemographics>> getAudienceDemographics(
+    SocialPlatform platform,
+  ) async {
+    final creds = await _getCredentials();
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
+    String? accountId = platform == SocialPlatform.facebook
+        ? creds['facebook_account_id']
+        : creds['instagram_account_id'];
+
+    if (accessToken == null || accountId == null) return [];
+
+    try {
+      return [
+        MetaAudienceDemographics(
+          ageGroup: '18-24',
+          percentage: 0.25,
+          genderPrimary: 'M',
+        ),
+        MetaAudienceDemographics(
+          ageGroup: '25-34',
+          percentage: 0.35,
+          genderPrimary: 'F',
+        ),
+        MetaAudienceDemographics(
+          ageGroup: '35-44',
+          percentage: 0.25,
+          genderPrimary: 'M',
+        ),
+        MetaAudienceDemographics(
+          ageGroup: '45+',
+          percentage: 0.15,
+          genderPrimary: null,
+        ),
+      ];
+    } catch (e) {
+      debugPrint("Error fetching audience demographics: $e");
+      return [];
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 17. GET PAGE INSIGHTS
   // ---------------------------------------------------------------------------
   Future<MetaPageInsights?> getPageInsights(SocialPlatform platform) async {
     final creds = await _getCredentials();
@@ -1457,7 +1379,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 12. GET POST INSIGHTS
+  // 18. GET POST INSIGHTS
   // ---------------------------------------------------------------------------
   Future<MetaPostInsights?> getPostInsights(String postId) async {
     final creds = await _getCredentials();
@@ -1507,68 +1429,9 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 13. GET STORY INSIGHTS
+  // 19. GET STORIES
   // ---------------------------------------------------------------------------
-  Future<MetaStoryInsights?> getStoryInsights(
-    String storyId,
-    SocialPlatform platform,
-  ) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    if (accessToken == null) return null;
-
-    try {
-      final url = Uri.parse(
-        'https://graph.facebook.com/$_graphApiVersion/$storyId/insights?metric=story_opens,story_replies,story_backwards,story_taps_forward&access_token=$accessToken',
-      );
-
-      final response = await http.get(url);
-      if (response.statusCode != 200) return null;
-
-      final data = json.decode(response.body);
-      int views = 0;
-      int replies = 0;
-      int exits = 0;
-      int nextTaps = 0;
-
-      if (data.containsKey('data')) {
-        for (var metric in data['data']) {
-          if (metric['name'] == 'story_opens') {
-            views = metric['values']?[0]?['value'] ?? 0;
-          } else if (metric['name'] == 'story_replies') {
-            replies = metric['values']?[0]?['value'] ?? 0;
-          } else if (metric['name'] == 'story_backwards') {
-            exits = metric['values']?[0]?['value'] ?? 0;
-          } else if (metric['name'] == 'story_taps_forward') {
-            nextTaps = metric['values']?[0]?['value'] ?? 0;
-          }
-        }
-      }
-
-      return MetaStoryInsights(
-        storyId: storyId,
-        platform: platform,
-        views: views,
-        replies: replies,
-        exits: exits,
-        nextStoryTaps: nextTaps,
-        createdTime: DateTime.now().toIso8601String(),
-      );
-    } catch (e) {
-      debugPrint("Error fetching story insights: $e");
-      return null;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 14. GET AUDIENCE DEMOGRAPHICS
-  // ---------------------------------------------------------------------------
-  Future<List<MetaAudienceDemographics>> getAudienceDemographics(
-    SocialPlatform platform,
-  ) async {
+  Future<List<MetaStory>> getStories(SocialPlatform platform) async {
     final creds = await _getCredentials();
     final String? accessToken =
         creds['facebook_page_access_token'] ??
@@ -1581,36 +1444,209 @@ class MetaService {
     if (accessToken == null || accountId == null) return [];
 
     try {
-      return [
-        MetaAudienceDemographics(
-          ageGroup: '18-24',
-          percentage: 0.25,
-          genderPrimary: 'M',
-        ),
-        MetaAudienceDemographics(
-          ageGroup: '25-34',
-          percentage: 0.35,
-          genderPrimary: 'F',
-        ),
-        MetaAudienceDemographics(
-          ageGroup: '35-44',
-          percentage: 0.25,
-          genderPrimary: 'M',
-        ),
-        MetaAudienceDemographics(
-          ageGroup: '45+',
-          percentage: 0.15,
-          genderPrimary: null,
-        ),
-      ];
+      final url =
+          'https://graph.facebook.com/$_graphApiVersion/$accountId/stories?fields=id,media_type,media_url,thumbnail_url,caption,created_time';
+
+      final response = await _makeAuthorizedGet(url, accessToken);
+      if (response.statusCode != 200) return [];
+
+      final data = json.decode(response.body);
+      if (!data.containsKey('data')) return [];
+
+      final List<dynamic> stories = data['data'];
+      return stories
+          .map(
+            (story) => MetaStory(
+              id: story['id'] ?? '',
+              mediaUrl: story['media_url'] ?? '',
+              caption: story['caption'],
+              platform: platform,
+              createdTime: story['created_time'] ?? '',
+              thumbnail: story['thumbnail_url'],
+            ),
+          )
+          .toList();
     } catch (e) {
-      debugPrint("Error fetching audience demographics: $e");
+      debugPrint("Error fetching stories: $e");
       return [];
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 15. GET TOP PERFORMING POSTS
+  // 20. GET REELS (now fetches from the Instagram account linked to the Facebook page)
+  // ---------------------------------------------------------------------------
+  Future<List<MetaReel>> getReels(SocialPlatform platform) async {
+    final creds = await _getCredentials();
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
+    if (accessToken == null) return [];
+
+    if (platform == SocialPlatform.instagram) {
+      final accountId = creds['instagram_account_id'];
+      if (accountId == null) return [];
+      return _fetchReels(accountId, accessToken, platform);
+    } else {
+      // Facebook: need to get the linked Instagram business account ID
+      final pageId = creds['facebook_account_id'];
+      if (pageId == null) return [];
+
+      final instagramAccountId = await _getInstagramAccountIdForPage(
+        pageId,
+        accessToken,
+      );
+      if (instagramAccountId == null) return [];
+
+      return _fetchReels(instagramAccountId, accessToken, platform);
+    }
+  }
+
+  /// Fetches the Instagram Business account ID linked to a Facebook page.
+  Future<String?> _getInstagramAccountIdForPage(
+    String pageId,
+    String accessToken,
+  ) async {
+    try {
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$pageId?fields=instagram_business_account&access_token=$accessToken',
+      );
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final instagramId = data['instagram_business_account']?['id'];
+        if (instagramId != null) {
+          debugPrint("Found Instagram business account ID: $instagramId");
+          return instagramId.toString();
+        }
+        debugPrint("No Instagram business account linked to page $pageId");
+      } else {
+        debugPrint(
+          "Failed to fetch Instagram account for page: ${response.body}",
+        );
+      }
+    } catch (e) {
+      debugPrint("Error fetching Instagram account: $e");
+    }
+    return null;
+  }
+
+  /// Fetches reels from a given account ID (Instagram Business account).
+  Future<List<MetaReel>> _fetchReels(
+    String accountId,
+    String accessToken,
+    SocialPlatform platform,
+  ) async {
+    try {
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$accountId/media'
+        '?media_type=REELS'
+        '&fields=id,title,media_type,media_url,thumbnail_url,caption,created_time,like_count,comments_count'
+        '&access_token=$accessToken',
+      );
+      final response = await http.get(url);
+      if (response.statusCode != 200) {
+        debugPrint("Failed to fetch reels: ${response.body}");
+        return [];
+      }
+      final data = json.decode(response.body);
+      if (!data.containsKey('data')) return [];
+
+      final List<dynamic> reels = data['data'];
+      return reels
+          .where(
+            (reel) =>
+                reel['media_type'] == 'REELS' || reel['media_type'] == 'REEL',
+          )
+          .map(
+            (reel) => MetaReel(
+              id: reel['id'] ?? '',
+              videoUrl: reel['media_url'] ?? '',
+              thumbnail: reel['thumbnail_url'],
+              caption: reel['caption'] ?? reel['title'] ?? '',
+              platform: platform,
+              createdTime: reel['created_time'] ?? '',
+              likes: reel['like_count'] ?? 0,
+              comments: reel['comments_count'] ?? 0,
+            ),
+          )
+          .toList();
+    } catch (e) {
+      debugPrint("Error fetching reels: $e");
+      return [];
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 21. GET POST LIKES
+  // ---------------------------------------------------------------------------
+  Future<List<Map<String, dynamic>>> getPostLikes(
+    String postId, {
+    SocialPlatform? platform,
+  }) async {
+    final creds = await _getCredentials();
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
+    if (accessToken == null) return [];
+
+    final bool isInstagram =
+        platform == SocialPlatform.instagram ||
+        postId.contains('instagram') ||
+        postId.startsWith('178') ||
+        postId.startsWith('179');
+
+    try {
+      if (isInstagram) {
+        final url = Uri.parse(
+          'https://graph.facebook.com/$_graphApiVersion/$postId?fields=like_count&access_token=$accessToken',
+        );
+
+        final response = await http.get(url);
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final likeCount = data['like_count'] ?? 0;
+
+          return [
+            {
+              'id': 'placeholder',
+              'name': '$likeCount people liked this post',
+              'is_placeholder': true,
+              'count': likeCount,
+            },
+          ];
+        }
+        return [];
+      } else {
+        final url = Uri.parse(
+          'https://graph.facebook.com/$_graphApiVersion/$postId/likes?fields=id,name&limit=100&access_token=$accessToken',
+        );
+
+        final response = await http.get(url);
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (!data.containsKey('data')) return [];
+
+          final List<dynamic> likes = data['data'];
+          return likes.map((like) {
+            return {
+              'id': like['id'] ?? '',
+              'name': like['name'] ?? 'Facebook User',
+            };
+          }).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint("❌ Error fetching likes: $e");
+    }
+    return [];
+  }
+
+  // ---------------------------------------------------------------------------
+  // 22. GET TOP PERFORMING POSTS
   // ---------------------------------------------------------------------------
   Future<List<MetaPostInsights>> getTopPerformingPosts(
     SocialPlatform platform, {
@@ -1666,380 +1702,7 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 16. GET STORIES
-  // ---------------------------------------------------------------------------
-  Future<List<MetaStory>> getStories(SocialPlatform platform) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    String? accountId = platform == SocialPlatform.facebook
-        ? creds['facebook_account_id']
-        : creds['instagram_account_id'];
-
-    if (accessToken == null || accountId == null) return [];
-
-    try {
-      final url =
-          'https://graph.facebook.com/$_graphApiVersion/$accountId/stories?fields=id,media_type,media_url,thumbnail_url,caption,created_time';
-
-      final response = await _makeAuthorizedGet(url, accessToken);
-      if (response.statusCode != 200) return [];
-
-      final data = json.decode(response.body);
-      if (!data.containsKey('data')) return [];
-
-      final List<dynamic> stories = data['data'];
-      return stories
-          .map(
-            (story) => MetaStory(
-              id: story['id'] ?? '',
-              mediaUrl: story['media_url'] ?? '',
-              caption: story['caption'],
-              platform: platform,
-              createdTime: story['created_time'] ?? '',
-              thumbnail: story['thumbnail_url'],
-            ),
-          )
-          .toList();
-    } catch (e) {
-      debugPrint("Error fetching stories: $e");
-      return [];
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 17. GET REELS
-  // ---------------------------------------------------------------------------
-  Future<List<MetaReel>> getReels(SocialPlatform platform) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    String? accountId = platform == SocialPlatform.facebook
-        ? creds['facebook_account_id']
-        : creds['instagram_account_id'];
-
-    if (accessToken == null || accountId == null) return [];
-
-    try {
-      final url =
-          'https://graph.facebook.com/$_graphApiVersion/$accountId/media?media_type=REELS&fields=id,title,media_type,media_url,thumbnail_url,caption,created_time,like_count,comments_count';
-
-      final response = await _makeAuthorizedGet(url, accessToken);
-      if (response.statusCode != 200) return [];
-
-      final data = json.decode(response.body);
-      if (!data.containsKey('data')) return [];
-
-      final List<dynamic> reels = data['data'];
-      return reels
-          .map(
-            (reel) => MetaReel(
-              id: reel['id'] ?? '',
-              videoUrl: reel['media_url'] ?? '',
-              thumbnail: reel['thumbnail_url'],
-              caption: reel['caption'] ?? reel['title'] ?? '',
-              platform: platform,
-              createdTime: reel['created_time'] ?? '',
-              likes: reel['like_count'] ?? 0,
-              comments: reel['comments_count'] ?? 0,
-            ),
-          )
-          .toList();
-    } catch (e) {
-      debugPrint("Error fetching reels: $e");
-      return [];
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 18. POST STORY
-  // ---------------------------------------------------------------------------
-  Future<bool> postStory(
-    SocialPlatform platform,
-    File imageFile,
-    String? caption,
-  ) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    String? accountId = platform == SocialPlatform.facebook
-        ? creds['facebook_account_id']
-        : creds['instagram_account_id'];
-
-    if (accessToken == null || accountId == null) return false;
-
-    if (platform == SocialPlatform.instagram) {
-      try {
-        // For Instagram stories, we need to upload to your service first
-        final publicUrl = await _uploadToMyService(imageFile);
-
-        if (publicUrl.isEmpty) return false;
-
-        final url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$accountId/media',
-        );
-
-        final response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'image_url': publicUrl,
-            'caption': caption,
-            'media_type': 'STORIES',
-            'access_token': accessToken,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          debugPrint("✅ Instagram story container created");
-          return true;
-        } else {
-          debugPrint("❌ Instagram story error: ${response.body}");
-          return false;
-        }
-      } catch (e) {
-        debugPrint("❌ Instagram story exception: $e");
-        return false;
-      }
-    } else {
-      // Facebook story (not implemented in current code)
-      return false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 19. POST REEL
-  // ---------------------------------------------------------------------------
-  Future<bool> postReel(
-    SocialPlatform platform,
-    File videoFile,
-    String caption,
-    File? thumbnail,
-  ) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    String? accountId = platform == SocialPlatform.facebook
-        ? creds['facebook_account_id']
-        : creds['instagram_account_id'];
-
-    if (accessToken == null || accountId == null) return false;
-
-    if (platform == SocialPlatform.instagram) {
-      try {
-        // For reels, we need to upload video to your service first
-        final publicUrl = await _uploadToMyService(videoFile);
-
-        if (publicUrl.isEmpty) return false;
-
-        final url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$accountId/media',
-        );
-
-        final response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'video_url': publicUrl,
-            'caption': caption,
-            'media_type': 'REELS',
-            'access_token': accessToken,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          debugPrint("✅ Instagram reel container created");
-          final containerId = json.decode(response.body)['id'];
-
-          // Reels require publishing separately
-          await Future.delayed(const Duration(seconds: 5));
-
-          final publishUrl = Uri.parse(
-            'https://graph.facebook.com/$_graphApiVersion/$accountId/media_publish',
-          );
-
-          final publishResponse = await http.post(
-            publishUrl,
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode({
-              'creation_id': containerId,
-              'access_token': accessToken,
-            }),
-          );
-
-          return publishResponse.statusCode == 200;
-        } else {
-          debugPrint("❌ Instagram reel error: ${response.body}");
-          return false;
-        }
-      } catch (e) {
-        debugPrint("❌ Instagram reel exception: $e");
-        return false;
-      }
-    } else {
-      return false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 20. DELETE STORY
-  // ---------------------------------------------------------------------------
-  Future<bool> deleteStory(String storyId) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    if (accessToken == null) return false;
-
-    try {
-      final url = Uri.parse(
-        'https://graph.facebook.com/$_graphApiVersion/$storyId?access_token=$accessToken',
-      );
-
-      final response = await http.delete(url);
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        debugPrint("✅ Story deleted successfully");
-        return true;
-      } else {
-        debugPrint("❌ Delete Error (${response.statusCode}): ${response.body}");
-        return false;
-      }
-    } catch (e) {
-      debugPrint("❌ Delete Exception: $e");
-      return false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 21. DELETE REEL
-  // ---------------------------------------------------------------------------
-  Future<bool> deleteReel(String reelId) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    if (accessToken == null) return false;
-
-    try {
-      final url = Uri.parse(
-        'https://graph.facebook.com/$_graphApiVersion/$reelId?access_token=$accessToken',
-      );
-
-      final response = await http.delete(url);
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        debugPrint("✅ Reel deleted successfully");
-        return true;
-      } else {
-        debugPrint("❌ Delete Error (${response.statusCode}): ${response.body}");
-        return false;
-      }
-    } catch (e) {
-      debugPrint("❌ Delete Exception: $e");
-      return false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 22. GET REEL INSIGHTS
-  // ---------------------------------------------------------------------------
-  Future<MetaStoryInsights?> getReelInsights(String reelId) async {
-    final creds = await _getCredentials();
-    final String? accessToken =
-        creds['facebook_page_access_token'] ??
-        creds['facebook_user_access_token'];
-
-    if (accessToken == null) return null;
-
-    try {
-      final url = Uri.parse(
-        'https://graph.facebook.com/$_graphApiVersion/$reelId/insights?metric=engagement,impression,video_views&access_token=$accessToken',
-      );
-
-      final response = await http.get(url);
-      if (response.statusCode != 200) return null;
-
-      final data = json.decode(response.body);
-      int engagement = 0;
-      int impressions = 0;
-      int views = 0;
-
-      if (data.containsKey('data')) {
-        for (var metric in data['data']) {
-          if (metric['name'] == 'engagement') {
-            engagement = metric['values']?[0]?['value'] ?? 0;
-          } else if (metric['name'] == 'impression') {
-            impressions = metric['values']?[0]?['value'] ?? 0;
-          } else if (metric['name'] == 'video_views') {
-            views = metric['values']?[0]?['value'] ?? 0;
-          }
-        }
-      }
-
-      return MetaStoryInsights(
-        storyId: reelId,
-        platform: SocialPlatform.instagram,
-        views: views,
-        replies: engagement,
-        exits: 0,
-        nextStoryTaps: impressions,
-        createdTime: DateTime.now().toIso8601String(),
-      );
-    } catch (e) {
-      debugPrint("Error fetching reel insights: $e");
-      return null;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 23. GET TOP PERFORMING REELS
-  // ---------------------------------------------------------------------------
-  Future<List<MetaReel>> getTopPerformingReels(
-    SocialPlatform platform, {
-    int limit = 5,
-  }) async {
-    try {
-      final reels = await getReels(platform);
-      final sorted = reels.toList()
-        ..sort((a, b) => b.totalEngagement.compareTo(a.totalEngagement));
-      return sorted.take(limit).toList();
-    } catch (e) {
-      debugPrint("Error fetching top reels: $e");
-      return [];
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 24. GET TOP PERFORMING STORIES
-  // ---------------------------------------------------------------------------
-  Future<List<MetaStory>> getTopPerformingStories(
-    SocialPlatform platform, {
-    int limit = 5,
-  }) async {
-    try {
-      final stories = await getStories(platform);
-      final sorted = stories.toList()
-        ..sort((a, b) => b.views.compareTo(a.views));
-      return sorted.take(limit).toList();
-    } catch (e) {
-      debugPrint("Error fetching top stories: $e");
-      return [];
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 25. GET STORIES & REELS SUMMARY
+  // 23. GET STORIES & REELS SUMMARY
   // ---------------------------------------------------------------------------
   Future<Map<String, dynamic>> getStoriesReelsSummary(
     SocialPlatform platform,
@@ -2099,7 +1762,61 @@ class MetaService {
   }
 
   // ---------------------------------------------------------------------------
-  // 26. EDIT STORY
+  // 24. POST STORY
+  // ---------------------------------------------------------------------------
+  Future<bool> postStory(
+    SocialPlatform platform,
+    File imageFile,
+    String? caption,
+  ) async {
+    final creds = await _getCredentials();
+    final String? accessToken =
+        creds['facebook_page_access_token'] ??
+        creds['facebook_user_access_token'];
+
+    String? accountId = platform == SocialPlatform.facebook
+        ? creds['facebook_account_id']
+        : creds['instagram_account_id'];
+
+    if (accessToken == null || accountId == null) return false;
+
+    if (platform == SocialPlatform.instagram) {
+      try {
+        final publicUrl = await _uploadToMyService(imageFile);
+        if (publicUrl.isEmpty) return false;
+
+        final url = Uri.parse(
+          'https://graph.facebook.com/$_graphApiVersion/$accountId/media',
+        );
+
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'image_url': publicUrl,
+            'caption': caption,
+            'media_type': 'STORIES',
+            'access_token': accessToken,
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          debugPrint("✅ Instagram story container created");
+          return true;
+        } else {
+          debugPrint("❌ Instagram story error: ${response.body}");
+          return false;
+        }
+      } catch (e) {
+        debugPrint("❌ Instagram story exception: $e");
+        return false;
+      }
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 25. EDIT STORY
   // ---------------------------------------------------------------------------
   Future<bool> editStory(String storyId, String newCaption) async {
     try {
@@ -2110,52 +1827,28 @@ class MetaService {
 
       if (accessToken == null) return false;
 
-      final url =
-          'https://graph.facebook.com/$_graphApiVersion/$storyId?caption=${Uri.encodeComponent(newCaption)}';
-      final response = await _makeAuthorizedPost(url, accessToken);
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$storyId',
+      );
+
+      final response = await http.post(
+        url,
+        body: {'caption': newCaption, 'access_token': accessToken},
+      );
 
       if (response.statusCode == 200) {
-        debugPrint("Story $storyId updated successfully");
+        debugPrint("✅ Story updated successfully");
         return true;
       }
-      debugPrint("Error editing story: ${response.body}");
       return false;
     } catch (e) {
-      debugPrint("Error editing story: $e");
+      debugPrint("❌ Error editing story: $e");
       return false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 27. EDIT REEL
-  // ---------------------------------------------------------------------------
-  Future<bool> editReel(String reelId, String newCaption) async {
-    try {
-      final creds = await _getCredentials();
-      final String? accessToken =
-          creds['facebook_page_access_token'] ??
-          creds['facebook_user_access_token'];
-
-      if (accessToken == null) return false;
-
-      final url =
-          'https://graph.facebook.com/$_graphApiVersion/$reelId?caption=${Uri.encodeComponent(newCaption)}';
-      final response = await _makeAuthorizedPost(url, accessToken);
-
-      if (response.statusCode == 200) {
-        debugPrint("Reel $reelId updated successfully");
-        return true;
-      }
-      debugPrint("Error editing reel: ${response.body}");
-      return false;
-    } catch (e) {
-      debugPrint("Error editing reel: $e");
-      return false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 28. ARCHIVE STORY
+  // 26. ARCHIVE STORY
   // ---------------------------------------------------------------------------
   Future<bool> archiveStory(String storyId) async {
     try {
@@ -2166,175 +1859,169 @@ class MetaService {
 
       if (accessToken == null) return false;
 
-      final url =
-          'https://graph.facebook.com/$_graphApiVersion/$storyId?status=ARCHIVED';
-      final response = await _makeAuthorizedPost(url, accessToken);
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$storyId',
+      );
+
+      final response = await http.post(
+        url,
+        body: {'is_archived': 'true', 'access_token': accessToken},
+      );
 
       if (response.statusCode == 200) {
-        debugPrint("Story $storyId archived successfully");
+        debugPrint("✅ Story archived successfully");
         return true;
       }
-      debugPrint("Error archiving story: ${response.body}");
       return false;
     } catch (e) {
-      debugPrint("Error archiving story: $e");
-      return false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 29. ARCHIVE REEL
-  // ---------------------------------------------------------------------------
-  Future<bool> archiveReel(String reelId) async {
-    try {
-      final creds = await _getCredentials();
-      final String? accessToken =
-          creds['facebook_page_access_token'] ??
-          creds['facebook_user_access_token'];
-
-      if (accessToken == null) return false;
-
-      final url =
-          'https://graph.facebook.com/$_graphApiVersion/$reelId?status=ARCHIVED';
-      final response = await _makeAuthorizedPost(url, accessToken);
-
-      if (response.statusCode == 200) {
-        debugPrint("Reel $reelId archived successfully");
-        return true;
-      }
-      debugPrint("Error archiving reel: ${response.body}");
-      return false;
-    } catch (e) {
-      debugPrint("Error archiving reel: $e");
+      debugPrint("❌ Error archiving story: $e");
       return false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 30. SEARCH STORIES
+  // 27. DELETE STORY
   // ---------------------------------------------------------------------------
-  Future<List<MetaStory>> searchStories(
-    SocialPlatform platform,
-    String query,
-  ) async {
-    try {
-      final stories = await getStories(platform);
-      return stories
-          .where(
-            (story) =>
-                story.caption?.toLowerCase().contains(query.toLowerCase()) ??
-                false,
-          )
-          .toList();
-    } catch (e) {
-      debugPrint("Error searching stories: $e");
-      return [];
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 31. SEARCH REELS
-  // ---------------------------------------------------------------------------
-  Future<List<MetaReel>> searchReels(
-    SocialPlatform platform,
-    String query,
-  ) async {
-    try {
-      final reels = await getReels(platform);
-      return reels
-          .where(
-            (reel) => reel.caption.toLowerCase().contains(query.toLowerCase()),
-          )
-          .toList();
-    } catch (e) {
-      debugPrint("Error searching reels: $e");
-      return [];
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 32. GET REEL COMMENTS
-  // ---------------------------------------------------------------------------
-  Future<List<MetaComment>> getReelComments(
-    String reelId, {
-    SocialPlatform platform = SocialPlatform.facebook,
-  }) async {
-    return getPostComments(reelId, platform: platform);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 33. GET POST LIKES
-  // ---------------------------------------------------------------------------
-  Future<List<Map<String, dynamic>>> getPostLikes(
-    String postId, {
-    SocialPlatform? platform,
-  }) async {
+  Future<bool> deleteStory(String storyId) async {
     final creds = await _getCredentials();
     final String? accessToken =
         creds['facebook_page_access_token'] ??
         creds['facebook_user_access_token'];
 
-    if (accessToken == null) return [];
-
-    final bool isInstagram =
-        platform == SocialPlatform.instagram ||
-        postId.contains('instagram') ||
-        postId.startsWith('178') ||
-        postId.startsWith('179');
+    if (accessToken == null) return false;
 
     try {
-      if (isInstagram) {
-        final url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$postId?fields=like_count&access_token=$accessToken',
-        );
+      final url = Uri.parse(
+        'https://graph.facebook.com/$_graphApiVersion/$storyId?access_token=$accessToken',
+      );
 
-        final response = await http.get(url);
+      final response = await http.delete(url);
 
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final likeCount = data['like_count'] ?? 0;
-
-          debugPrint("✅ Instagram like count: $likeCount");
-
-          return [
-            {
-              'id': 'placeholder',
-              'name': '$likeCount people liked this post',
-              'username': 'Instagram does not provide list of likers',
-              'is_placeholder': true,
-              'count': likeCount,
-            },
-          ];
-        }
-        return [];
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        debugPrint("✅ Story deleted successfully");
+        return true;
       } else {
-        final url = Uri.parse(
-          'https://graph.facebook.com/$_graphApiVersion/$postId/likes?fields=id,name&limit=100&access_token=$accessToken',
-        );
-
-        debugPrint("📥 Fetching Facebook likes from: $url");
-        final response = await http.get(url);
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (!data.containsKey('data')) return [];
-
-          final List<dynamic> likes = data['data'];
-          debugPrint("✅ Found ${likes.length} Facebook likes");
-
-          return likes.map((like) {
-            return {
-              'id': like['id'] ?? '',
-              'name': like['name'] ?? 'Facebook User',
-            };
-          }).toList();
-        } else {
-          debugPrint("❌ Facebook likes error: ${response.body}");
-        }
+        debugPrint("❌ Delete Error: ${response.body}");
+        return false;
       }
     } catch (e) {
-      debugPrint("❌ Error fetching likes: $e");
+      debugPrint("❌ Delete Exception: $e");
+      return false;
     }
-    return [];
+  }
+
+  // 28. GET PAGE INFO (Fetch from API if not in credentials)
+  // ---------------------------------------------------------------------------
+  Future<Map<String, String>> getPageInfo() async {
+    try {
+      final creds = await _getCredentials();
+      final String? accessToken = creds['facebook_page_access_token'];
+
+      String facebookPageName = 'Not connected';
+      String facebookPagePicture = '';
+      String instagramAccountName = 'Not connected';
+      String instagramAccountPicture = '';
+
+      // Get Facebook Page info
+      final fbPageId = creds['facebook_account_id'];
+      if (fbPageId != null && accessToken != null) {
+        try {
+          // Method 1: Get picture from fields
+          final response = await http.get(
+            Uri.parse(
+              'https://graph.facebook.com/$_graphApiVersion/$fbPageId?fields=name,picture.width(200).height(200)&access_token=$accessToken',
+            ),
+          );
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            facebookPageName = data['name'] ?? 'Facebook Page';
+            if (data['picture'] != null && data['picture']['data'] != null) {
+              facebookPagePicture = data['picture']['data']['url'] ?? '';
+            }
+            debugPrint("✅ Facebook page: $facebookPageName");
+          }
+
+          // Method 2: If still no picture, try direct picture endpoint
+          if (facebookPagePicture.isEmpty) {
+            final picResponse = await http.get(
+              Uri.parse(
+                'https://graph.facebook.com/$fbPageId/picture?type=large&redirect=false&access_token=$accessToken',
+              ),
+            );
+            if (picResponse.statusCode == 200) {
+              final picData = json.decode(picResponse.body);
+              if (picData['data'] != null && picData['data']['url'] != null) {
+                facebookPagePicture = picData['data']['url'];
+                debugPrint(
+                  "✅ Facebook page picture from direct endpoint: $facebookPagePicture",
+                );
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint("Error fetching Facebook page info: $e");
+        }
+      }
+
+      // Get Instagram Account info
+      final igId = creds['instagram_account_id'];
+      if (igId != null && accessToken != null) {
+        try {
+          // Method 1: Try profile_picture_url field
+          final response = await http.get(
+            Uri.parse(
+              'https://graph.facebook.com/$_graphApiVersion/$igId?fields=username,profile_picture_url&access_token=$accessToken',
+            ),
+          );
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            instagramAccountName = data['username'] ?? 'Instagram Account';
+            instagramAccountPicture = data['profile_picture_url'] ?? '';
+            debugPrint("✅ Instagram account: $instagramAccountName");
+          } else {
+            // Method 2: Try profile_pic field
+            final altResponse = await http.get(
+              Uri.parse(
+                'https://graph.facebook.com/$_graphApiVersion/$igId?fields=username,profile_pic&access_token=$accessToken',
+              ),
+            );
+            if (altResponse.statusCode == 200) {
+              final altData = json.decode(altResponse.body);
+              instagramAccountName = altData['username'] ?? 'Instagram Account';
+              instagramAccountPicture = altData['profile_pic'] ?? '';
+              debugPrint("✅ Instagram account from alt: $instagramAccountName");
+            }
+          }
+        } catch (e) {
+          debugPrint("Error fetching Instagram account info: $e");
+        }
+      }
+
+      debugPrint(
+        "📸 Facebook picture: ${facebookPagePicture.isNotEmpty ? 'Yes' : 'No'}",
+      );
+      debugPrint(
+        "📸 Instagram picture: ${instagramAccountPicture.isNotEmpty ? 'Yes' : 'No'}",
+      );
+
+      return {
+        'facebook_page_name': facebookPageName,
+        'facebook_page_picture': facebookPagePicture,
+        'instagram_account_name': instagramAccountName,
+        'instagram_account_picture': instagramAccountPicture,
+        'facebook_page_id': fbPageId?.toString() ?? '',
+        'instagram_account_id': igId?.toString() ?? '',
+      };
+    } catch (e) {
+      debugPrint("❌ Error getting page info: $e");
+      return {
+        'facebook_page_name': 'Not connected',
+        'facebook_page_picture': '',
+        'instagram_account_name': 'Not connected',
+        'instagram_account_picture': '',
+        'facebook_page_id': '',
+        'instagram_account_id': '',
+      };
+    }
   }
 }

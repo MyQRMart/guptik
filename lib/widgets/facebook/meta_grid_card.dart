@@ -647,6 +647,10 @@ class _MetaGridCardState extends State<MetaGridCard> {
                         builder: (context) => FullScreenMediaScreen(
                           imageUrl: widget.content.imageUrl!,
                           caption: widget.content.caption,
+                          postId: widget.content.id,
+                          platform: widget.content.platform,
+                          initialLikes: widget.content.likes,
+                          initialComments: widget.content.comments,
                         ),
                       ),
                     );
@@ -690,17 +694,17 @@ class _MetaGridCardState extends State<MetaGridCard> {
                     children: [
                       Icon(
                         Icons.favorite,
-                        size: 18,
+                        size: 30,
                         color: _showLikes ? Colors.red : Colors.red[300],
                       ),
                       const SizedBox(width: 6),
                       Text(
                         _formatNumber(widget.content.likes),
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: _showLikes
                               ? FontWeight.bold
-                              : FontWeight.normal,
+                              : FontWeight.w600,
                         ),
                       ),
                     ],
@@ -715,17 +719,17 @@ class _MetaGridCardState extends State<MetaGridCard> {
                     children: [
                       Icon(
                         Icons.comment,
-                        size: 18,
+                        size: 30,
                         color: _showComments ? Colors.blue : Colors.blue[300],
                       ),
                       const SizedBox(width: 6),
                       Text(
                         _formatNumber(_getTotalCommentCount()),
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: _showComments
                               ? FontWeight.bold
-                              : FontWeight.normal,
+                              : FontWeight.w600,
                         ),
                       ),
                     ],

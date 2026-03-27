@@ -1,12 +1,15 @@
 class ReelUtils {
-  // Extract reel ID from the post ID or video URL
   static String extractReelId(String postId, String? videoUrl) {
-    // Instagram media IDs that start with 178 or 179 are usually reel IDs
-    if (postId.startsWith('178') || postId.startsWith('179')) {
+    // Instagram Reel IDs are usually the post ID itself
+    // They typically start with 178, 179, 180, 181
+    if (postId.startsWith('178') ||
+        postId.startsWith('179') ||
+        postId.startsWith('180') ||
+        postId.startsWith('181')) {
       return postId;
     }
 
-    // Try to extract from video URL if it contains a reel ID
+    // Try to extract from video URL if available
     if (videoUrl != null && videoUrl.contains('/reel/')) {
       final uri = Uri.tryParse(videoUrl);
       if (uri != null) {
@@ -18,7 +21,6 @@ class ReelUtils {
       }
     }
 
-    // Return the post ID as fallback
     return postId;
   }
 

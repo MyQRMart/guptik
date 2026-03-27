@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:guptik/models/facebook/meta_content_model.dart';
 import 'package:guptik/models/facebook/meta_story_reel_model.dart';
 import 'package:guptik/services/facebook/meta_service.dart';
-import 'package:guptik/widgets/facebook/instagram_reel_player.dart';
+import 'package:guptik/widgets/facebook/reel_player_widget.dart';
 
 class ReelsScreen extends StatefulWidget {
   final SocialPlatform platform;
@@ -26,6 +26,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
   }
 
   Future<void> _loadReels() async {
+    setState(() => _isLoading = true);
     try {
       final reels = await _metaService.getReels(widget.platform);
       if (mounted) {
@@ -35,21 +36,20 @@ class _ReelsScreenState extends State<ReelsScreen> {
         });
       }
     } catch (e) {
+      debugPrint("Error loading reels: $e");
       if (mounted) {
         setState(() => _isLoading = false);
       }
-      debugPrint("Error loading reels: $e");
     }
   }
 
-  // Extract reel ID from various formats
   String _extractReelId(MetaReel reel) {
-    // Instagram Reel IDs usually start with 178 or 179
-    if (reel.id.startsWith('178') || reel.id.startsWith('179')) {
+    if (reel.id.startsWith('178') ||
+        reel.id.startsWith('179') ||
+        reel.id.startsWith('180') ||
+        reel.id.startsWith('181')) {
       return reel.id;
     }
-
-    // Try to extract from video URL
     if (reel.videoUrl.contains('/reel/')) {
       final uri = Uri.tryParse(reel.videoUrl);
       if (uri != null) {
@@ -60,7 +60,6 @@ class _ReelsScreenState extends State<ReelsScreen> {
         }
       }
     }
-
     return reel.id;
   }
 
@@ -86,9 +85,36 @@ class _ReelsScreenState extends State<ReelsScreen> {
                   Icon(Icons.videocam_off, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'No reels found',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                    widget.platform == SocialPlatform.facebook
+                        ? 'No reels found for this Facebook page.\n'
+                              'Make sure your page is connected to an Instagram business account.'
+                        : 'No reels found',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
+                  if (widget.platform == SocialPlatform.facebook) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Connect Instagram'),
+                            content: const Text(
+                              'To see reels for your Facebook page, you need to connect an Instagram business account in your app settings.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      child: const Text('Learn More'),
+                    ),
+                  ],
                 ],
               ),
             )
@@ -122,20 +148,17 @@ class _ReelsScreenState extends State<ReelsScreen> {
                         clipBehavior: Clip.antiAlias,
                         child: Stack(
                           children: [
-                            // Instagram Reel Player
-                            InstagramReelPlayer(
+                            ReelPlayerWidget(
                               reelId: reelId,
                               thumbnailUrl: reel.thumbnail,
                             ),
-
-                            // Play/Pause overlay (optional)
                             if (!isPlaying)
                               Positioned(
                                 bottom: 16,
                                 right: 16,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.6),
+                                    color: Colors.black.withOpacity(0.6),
                                     shape: BoxShape.circle,
                                   ),
                                   child: IconButton(
@@ -146,7 +169,6 @@ class _ReelsScreenState extends State<ReelsScreen> {
                                     ),
                                     onPressed: () {
                                       // The WebView handles play/pause automatically
-                                      // This is just for visual feedback
                                     },
                                   ),
                                 ),
@@ -154,14 +176,12 @@ class _ReelsScreenState extends State<ReelsScreen> {
                           ],
                         ),
                       ),
-
                       // Reel Details
                       Padding(
                         padding: const EdgeInsets.all(12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Caption
                             Text(
                               reel.caption.isEmpty
                                   ? '(No caption)'
@@ -174,8 +194,6 @@ class _ReelsScreenState extends State<ReelsScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-
-                            // Engagement Stats
                             Row(
                               children: [
                                 _buildStatChip(
@@ -198,8 +216,6 @@ class _ReelsScreenState extends State<ReelsScreen> {
                               ],
                             ),
                             const SizedBox(height: 8),
-
-                            // Time
                             Text(
                               reel.timeElapsed,
                               style: TextStyle(
@@ -226,7 +242,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
