@@ -6,7 +6,7 @@ class Board {
   final String id;
   final String ownerId;
   final String name;
-  final String? roomId; 
+  final String? roomId;
   final BoardStatus status;
   final String? macAddress;
   final DateTime? lastOnline;
@@ -37,9 +37,15 @@ class Board {
         orElse: () => BoardStatus.offline,
       ),
       macAddress: json['mac_address'],
-      lastOnline: json['last_online'] != null ? DateTime.parse(json['last_online']) : null,
+      lastOnline: json['last_online'] != null
+          ? DateTime.parse(json['last_online'])
+          : null,
       isActive: json['is_active'] ?? true,
-      switches: (switchesList as List?)?.map((s) => SwitchDevice.fromJson(s)).toList() ?? [],
+      switches:
+          (switchesList as List?)
+              ?.map((s) => SwitchDevice.fromJson(s))
+              .toList() ??
+          [],
     );
   }
 

@@ -8,18 +8,23 @@ import '../../models/home_control/switch_model.dart';
 import '../../models/home_control/switch_type.dart';
 import '../../providers/home_control/dynamic_theme_provider.dart';
 import '../../widgets/home_control/home_control_widgets.dart';
-import 'timer_screen.dart'; 
+import 'timer_screen.dart';
 
 class SwitchControlScreen extends StatefulWidget {
   final String boardId;
   final String boardName;
-  const SwitchControlScreen({super.key, required this.boardId, required this.boardName});
+  const SwitchControlScreen({
+    super.key,
+    required this.boardId,
+    required this.boardName,
+  });
 
   @override
   State<SwitchControlScreen> createState() => _SwitchControlScreenState();
 }
 
-class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerProviderStateMixin {
+class _SwitchControlScreenState extends State<SwitchControlScreen>
+    with TickerProviderStateMixin {
   final _supabase = Supabase.instance.client;
   final _uuid = const Uuid();
   List<SwitchDevice> _switches = [];
@@ -34,7 +39,7 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
       vsync: this,
       duration: const Duration(seconds: 1),
     )..repeat();
-    
+
     _loadSwitches();
     _subscribe();
   }
@@ -46,14 +51,20 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
   }
 
   void _subscribe() {
-    _supabase.channel('public:hc_switches:board_id=${widget.boardId}')
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'hc_switches',
-        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'board_id', value: widget.boardId),
-        callback: (payload) => _loadSwitches(),
-      ).subscribe();
+    _supabase
+        .channel('public:hc_switches:board_id=${widget.boardId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'hc_switches',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'board_id',
+            value: widget.boardId,
+          ),
+          callback: (payload) => _loadSwitches(),
+        )
+        .subscribe();
   }
 
   Future<void> _loadSwitches() async {
@@ -63,10 +74,12 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
           .select()
           .eq('board_id', widget.boardId)
           .order('position');
-          
+
       if (mounted) {
         setState(() {
-          _switches = (res as List).map((e) => SwitchDevice.fromJson(e)).toList();
+          _switches = (res as List)
+              .map((e) => SwitchDevice.fromJson(e))
+              .toList();
           _isLoading = false;
         });
       }
@@ -84,10 +97,16 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
     });
 
     try {
-      await _supabase.from('hc_switches').update({'state': !s.state}).eq('id', s.id);
+      await _supabase
+          .from('hc_switches')
+          .update({'state': !s.state})
+          .eq('id', s.id);
     } catch (e) {
-      _loadSwitches(); 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      _loadSwitches();
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -100,25 +119,35 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
         'board_id': widget.boardId,
         'name': name,
         'type': type.name,
-        'position': _switches.length,
+        'position': _switches.length + 1,
         'state': false,
         'is_enabled': true,
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
-  Future<void> _editSwitch(SwitchDevice s, String newName, SwitchType newType) async {
+  Future<void> _editSwitch(
+    SwitchDevice s,
+    String newName,
+    SwitchType newType,
+  ) async {
     try {
-      await _supabase.from('hc_switches').update({
-        'name': newName,
-        'type': newType.name,
-      }).eq('id', s.id);
+      await _supabase
+          .from('hc_switches')
+          .update({'name': newName, 'type': newType.name})
+          .eq('id', s.id);
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -128,7 +157,10 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
       await _supabase.from('hc_switches').delete().eq('id', id);
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -148,27 +180,48 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
                 autofocus: true,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<SwitchType>(
                 // ignore: deprecated_member_use
-                value: selectedType, // Keeping 'value' is correct for controlled inputs despite deprecation warning
-                decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
-                items: SwitchType.values.map((t) => DropdownMenuItem(
-                  value: t, 
-                  child: Row(children: [Icon(_getIconForType(t), size: 16), const SizedBox(width: 8), Text(t.name.toUpperCase())])
-                )).toList(),
+                value:
+                    selectedType, // Keeping 'value' is correct for controlled inputs despite deprecation warning
+                decoration: const InputDecoration(
+                  labelText: 'Type',
+                  border: OutlineInputBorder(),
+                ),
+                items: SwitchType.values
+                    .map(
+                      (t) => DropdownMenuItem(
+                        value: t,
+                        child: Row(
+                          children: [
+                            Icon(_getIconForType(t), size: 16),
+                            const SizedBox(width: 8),
+                            Text(t.name.toUpperCase()),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) => setDialogState(() => selectedType = val!),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () {
-                if (nameController.text.isNotEmpty) _addSwitch(nameController.text.trim(), selectedType);
+                if (nameController.text.isNotEmpty)
+                  _addSwitch(nameController.text.trim(), selectedType);
               },
               child: const Text('Add'),
             ),
@@ -198,18 +251,26 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
               DropdownButtonFormField<SwitchType>(
                 // ignore: deprecated_member_use
                 value: selectedType,
-                items: SwitchType.values.map((t) => DropdownMenuItem(
-                  value: t, 
-                  child: Text(t.name.toUpperCase())
-                )).toList(),
+                items: SwitchType.values
+                    .map(
+                      (t) => DropdownMenuItem(
+                        value: t,
+                        child: Text(t.name.toUpperCase()),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) => setDialogState(() => selectedType = val!),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
-              onPressed: () => _editSwitch(device, nameController.text, selectedType),
+              onPressed: () =>
+                  _editSwitch(device, nameController.text, selectedType),
               child: const Text('Save'),
             ),
           ],
@@ -225,7 +286,10 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
         title: const Text('Delete Device?'),
         content: Text('Are you sure you want to delete "${device.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => _deleteSwitch(device.id),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -271,162 +335,199 @@ class _SwitchControlScreenState extends State<SwitchControlScreen> with TickerPr
 
   IconData _getIconForType(SwitchType type) {
     switch (type) {
-      case SwitchType.fan: return Icons.mode_fan_off;
-      case SwitchType.ac: return Icons.ac_unit;
-      case SwitchType.light: return Icons.lightbulb;
-      case SwitchType.tv: return Icons.tv;
-      default: return Icons.power_settings_new;
+      case SwitchType.fan:
+        return Icons.mode_fan_off;
+      case SwitchType.ac:
+        return Icons.ac_unit;
+      case SwitchType.light:
+        return Icons.lightbulb;
+      case SwitchType.tv:
+        return Icons.tv;
+      default:
+        return Icons.power_settings_new;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Provider.of<DynamicThemeProvider>(context);
-    
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.boardName, style: const TextStyle(color: Colors.white)),
+        title: Text(
+          widget.boardName,
+          style: const TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.transparent,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       extendBodyBehindAppBar: true,
       body: AnimatedSkyBackground(
         isDarkMode: theme.isDarkMode,
-        child: _isLoading 
-          ? const Center(child: CircularProgressIndicator(color: Colors.white)) 
-          : GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, 
-                mainAxisSpacing: 16, 
-                crossAxisSpacing: 16,
-                childAspectRatio: 1.1,
-              ),
-              itemCount: _switches.length + 1,
-              itemBuilder: (context, index) {
-                // Add Switch Button
-                if (index == _switches.length) {
-                  return Card(
-                    elevation: 0,
-                    // FIX: withOpacity -> withValues
-                    color: Colors.white.withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: const BorderSide(color: Colors.white30, width: 1),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: _showAddSwitchDialog,
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_circle_outline, size: 40, color: Colors.white70),
-                            SizedBox(height: 8),
-                            Text("Add Switch", style: TextStyle(color: Colors.white70)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                // Switch Card
-                final device = _switches[index];
-                
-                return GestureDetector(
-                  onLongPress: () => _showOptionsSheet(device),
-                  child: Container(
-                    decoration: BoxDecoration(
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              )
+            : GridView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 1.1,
+                ),
+                itemCount: _switches.length + 1,
+                itemBuilder: (context, index) {
+                  // Add Switch Button
+                  if (index == _switches.length) {
+                    return Card(
+                      elevation: 0,
                       // FIX: withOpacity -> withValues
                       color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white30),
-                      boxShadow: [
-                         BoxShadow(
-                           // FIX: withOpacity -> withValues
-                           color: Colors.black.withValues(alpha: 0.1),
-                           blurRadius: 8,
-                           offset: const Offset(0, 4),
-                         )
-                      ]
-                    ),
-                    child: Stack(
-                      children: [
-                        Center(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: const BorderSide(color: Colors.white30, width: 1),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: _showAddSwitchDialog,
+                        child: const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (device.type == SwitchType.fan && device.state)
-                                 RotationTransition(
-                                   turns: _fanController,
-                                   child: Icon(_getIconForType(device.type), size: 40, color: Colors.white),
-                                 )
-                              else
-                                 Icon(
-                                   _getIconForType(device.type), 
-                                   size: 40, 
-                                   color: device.state ? Colors.yellowAccent : Colors.white54
-                                 ),
-                                 
-                              const SizedBox(height: 12),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                child: Text(
-                                  device.name, 
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
-                                ),
+                              Icon(
+                                Icons.add_circle_outline,
+                                size: 40,
+                                color: Colors.white70,
                               ),
-                              const SizedBox(height: 8),
-                              Switch(
-                                value: device.state,
-                                onChanged: (val) => _toggle(device),
-                                // FIX: activeColor -> activeTrackColor
-                                activeTrackColor: Colors.cyanAccent,
+                              SizedBox(height: 8),
+                              Text(
+                                "Add Switch",
+                                style: TextStyle(color: Colors.white70),
                               ),
                             ],
                           ),
                         ),
-                        
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: IconButton(
-                            icon: const Icon(Icons.alarm, color: Colors.white70, size: 20),
-                            tooltip: 'Manage Timers',
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => TimerScreen(
-                                    boardId: widget.boardId,
-                                    boardName: widget.boardName,
-                                    switches: _switches,
-                                    initialSwitchId: device.id,
+                      ),
+                    );
+                  }
+
+                  // Switch Card
+                  final device = _switches[index];
+
+                  return GestureDetector(
+                    onLongPress: () => _showOptionsSheet(device),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        // FIX: withOpacity -> withValues
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white30),
+                        boxShadow: [
+                          BoxShadow(
+                            // FIX: withOpacity -> withValues
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (device.type == SwitchType.fan &&
+                                    device.state)
+                                  RotationTransition(
+                                    turns: _fanController,
+                                    child: Icon(
+                                      _getIconForType(device.type),
+                                      size: 40,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                else
+                                  Icon(
+                                    _getIconForType(device.type),
+                                    size: 40,
+                                    color: device.state
+                                        ? Colors.yellowAccent
+                                        : Colors.white54,
+                                  ),
+
+                                const SizedBox(height: 12),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8.0,
+                                  ),
+                                  child: Text(
+                                    device.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              );
-                            },
+                                const SizedBox(height: 8),
+                                Switch(
+                                  value: device.state,
+                                  onChanged: (val) => _toggle(device),
+                                  // FIX: activeColor -> activeTrackColor
+                                  activeTrackColor: Colors.cyanAccent,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
 
-                        Positioned(
-                          top: 4,
-                          left: 4,
-                          child: IconButton(
-                            icon: const Icon(Icons.more_vert, color: Colors.white54, size: 20),
-                            tooltip: 'Options',
-                            onPressed: () => _showOptionsSheet(device),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.alarm,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              tooltip: 'Manage Timers',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TimerScreen(
+                                      boardId: widget.boardId,
+                                      boardName: widget.boardName,
+                                      switches: _switches,
+                                      initialSwitchId: device.id,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
+
+                          Positioned(
+                            top: 4,
+                            left: 4,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white54,
+                                size: 20,
+                              ),
+                              tooltip: 'Options',
+                              onPressed: () => _showOptionsSheet(device),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
       ),
     );
   }

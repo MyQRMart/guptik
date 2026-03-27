@@ -1,14 +1,23 @@
-
 enum ThemeType { basic, animated, dynamicTime, dynamicWeather }
+
 enum TimeOfDay { sunrise, morning, afternoon, sunset, night }
-enum WeatherCondition { sunny, cloudy, rainy, thunderstorm, snowy, foggy, partlyCloudy }
+
+enum WeatherCondition {
+  sunny,
+  cloudy,
+  rainy,
+  thunderstorm,
+  snowy,
+  foggy,
+  partlyCloudy,
+}
 
 class ThemeSettings {
   final ThemeType themeType;
   final bool isDarkMode;
   final TimeOfDay currentTimeOfDay;
   final WeatherCondition currentWeather;
-  
+
   // These were missing and causing your errors:
   final bool autoSwitchByTime;
   final bool autoSwitchByWeather;

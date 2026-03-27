@@ -12,7 +12,7 @@ class SwitchTimer {
   SwitchTimer({
     required this.id,
     required this.switchId,
-    required this.userId, 
+    required this.userId,
     required this.time,
     required this.action,
     this.isActive = true,
@@ -22,7 +22,7 @@ class SwitchTimer {
   factory SwitchTimer.fromJson(Map<String, dynamic> json) {
     // Parse time "HH:MM"
     final timeParts = (json['time'] as String).split(':');
-    
+
     // Map 'days_of_week' (e.g. [1, 2]) to repeatDays boolean list
     // Assuming DB stores 1=Mon, 2=Tue... 7=Sun
     List<bool> days = List.filled(7, false);
@@ -45,7 +45,7 @@ class SwitchTimer {
         minute: int.parse(timeParts[1]),
       ),
       action: json['action'] ?? true,
-      isActive: json['is_active'] ?? true,
+      isActive: json['is_enabled'] ?? true,
       repeatDays: days,
     );
   }
@@ -63,9 +63,10 @@ class SwitchTimer {
       'id': id,
       'switch_id': switchId,
       'user_id': userId, // ✅ Sending user_id
-      'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+      'time':
+          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
       'action': action,
-      'is_active': isActive,
+      'is_enabled': isActive,
       'days_of_week': dbDays, // ✅ Mapping to correct column name
       'type': 'scheduled', // Matches your check constraint
     };

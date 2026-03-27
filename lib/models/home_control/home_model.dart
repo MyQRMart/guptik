@@ -7,7 +7,7 @@ class Home {
   final String name;
   final String? wallpaperPath;
   final List<Board> boards; // Strongly typed as Board
-  final List<Room> rooms;   // Strongly typed as Room
+  final List<Room> rooms; // Strongly typed as Room
 
   Home({
     required this.id,
@@ -29,12 +29,12 @@ class Home {
       userId: json['user_id'],
       name: json['name'],
       wallpaperPath: json['wallpaper_path'],
-      
+
       // 3. Map the lists safely
       boards: boardsList != null
           ? (boardsList as List).map((b) => Board.fromJson(b)).toList()
           : [],
-          
+
       rooms: roomsList != null
           ? (roomsList as List).map((r) => Room.fromJson(r)).toList()
           : [],

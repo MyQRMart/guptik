@@ -569,7 +569,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
                           child: DynamicBackgroundWidget(
                             child: BoardListScreen(
                               homeName: widget.homeName,
-                              homeId: widget.homeId
+                              homeId: widget.homeId,
                             ),
                           ),
                         );
@@ -677,11 +677,12 @@ class _RoomListScreenState extends State<RoomListScreen> {
                                   pageBuilder:
                                       (context, animation, secondaryAnimation) {
                                         return ChangeNotifierProvider.value(
-                                          value: themeProvider, // <--- DIRECT PASS
+                                          value:
+                                              themeProvider, // <--- DIRECT PASS
                                           child: DynamicBackgroundWidget(
                                             child: BoardListScreen(
                                               homeName: widget.homeName,
-                                              homeId: widget.homeId
+                                              homeId: widget.homeId,
                                             ),
                                           ),
                                         );
@@ -712,8 +713,12 @@ class _RoomListScreenState extends State<RoomListScreen> {
                                       Container(
                                         decoration: BoxDecoration(
                                           color: isDark
-                                              ? Colors.grey[800]!.withValues(alpha: 0.5)
-                                              : Colors.grey[200]!.withValues(alpha: 0.5),
+                                              ? Colors.grey[800]!.withValues(
+                                                  alpha: 0.5,
+                                                )
+                                              : Colors.grey[200]!.withValues(
+                                                  alpha: 0.5,
+                                                ),
 
                                           borderRadius: BorderRadius.circular(
                                             20,
@@ -758,7 +763,9 @@ class _RoomListScreenState extends State<RoomListScreen> {
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.3),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.3,
+                                              ),
                                               blurRadius: 8,
                                               offset: const Offset(0, 4),
                                             ),

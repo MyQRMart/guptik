@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/home_control/switch_model.dart';
-// ✅ FIX 1: Re-added missing import
 import '../../models/home_control/switch_type.dart';
 import '../../models/home_control/timer_model.dart';
 
@@ -176,7 +175,6 @@ class _TimerScreenState extends State<TimerScreen> {
                 if (timerType == TimerType.scheduled) ...[
                   ListTile(
                     title: const Text('Time'),
-                    // Using Builder to get a context that is definitely mounted for the dialog
                     trailing: Builder(
                       builder: (innerContext) {
                         return TextButton(
@@ -288,21 +286,31 @@ class _TimerScreenState extends State<TimerScreen> {
                 ),
                 const Divider(),
                 const Text('Select Switch:'),
+
+                // ✅ FIX: Replaced individual RadioListTile properties with RadioGroup
                 if (widget.switches.isEmpty)
                   const Text(
                     "No switches found",
                     style: TextStyle(color: Colors.red),
-                  ),
-                ...widget.switches.map(
-                  (switch_) => RadioListTile<SwitchDevice>(
-                    title: Text(switch_.name),
-                    value: switch_,
+                  )
+                else
+                  RadioGroup<SwitchDevice>(
                     groupValue: selectedSwitch,
                     onChanged: (SwitchDevice? value) {
                       setState(() => selectedSwitch = value);
                     },
+                    child: Column(
+                      children: widget.switches
+                          .map(
+                            (switch_) => RadioListTile<SwitchDevice>(
+                              title: Text(switch_.name),
+                              value: switch_,
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
-                ),
+
                 const Divider(),
                 SwitchListTile(
                   title: const Text('Action'),
@@ -347,6 +355,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               .toList();
                         }
 
+                        // ✅ FIX: Fixed the DateTime.now() missing parentheses
                         final timerData = {
                           'id': const Uuid().v4(),
                           'switch_id': selectedSwitch!.id,
@@ -376,7 +385,6 @@ class _TimerScreenState extends State<TimerScreen> {
 
                         await _supabase.from('hc_timers').insert(timerData);
 
-                        // ✅ FIX 2: Check mounted before using context
                         if (!context.mounted) return;
 
                         Navigator.pop(context);
@@ -445,7 +453,7 @@ class _TimerScreenState extends State<TimerScreen> {
         id: '',
         boardId: '',
         name: 'Unknown Switch',
-        type: SwitchType.light, // ✅ Fixed: Now SwitchType is defined
+        type: SwitchType.light,
         position: 0,
         state: false,
       ),
