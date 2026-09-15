@@ -17,7 +17,7 @@ class PlayerVideo {
 
   // 🚀 AUDIENCE & MONETIZATION
   final bool madeForKids;
-  final String ageRating; // 'all' or '18+'
+  final String ageRating; // 'all' or '18+' 19+
   final String category;
   final List<String> tags;
   final bool isMonetized;
