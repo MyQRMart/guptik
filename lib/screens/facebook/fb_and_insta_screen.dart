@@ -163,7 +163,7 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildQuickActionButton(
-                  icon: FontAwesomeIcons.facebook,
+                  icon: FontAwesomeIcons.facebook.data,
                   label: 'FB Analytics',
                   color: AppTheme.facebookBlue,
                   onTap: () {
@@ -179,7 +179,7 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
                   },
                 ),
                 _buildQuickActionButton(
-                  icon: FontAwesomeIcons.instagram,
+                  icon: FontAwesomeIcons.instagram.data,
                   label: 'IG Analytics',
                   color: AppTheme.instagramPink,
                   onTap: () {
@@ -735,7 +735,7 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
                               'Facebook',
                               _formatNumber(_fbFollowers),
                               AppTheme.facebookBlue,
-                              FontAwesomeIcons.facebook,
+                              FontAwesomeIcons.facebook.data,
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
@@ -744,7 +744,7 @@ class _FbAndInstaScreenState extends State<FbAndInstaScreen> {
                               'Instagram',
                               _formatNumber(_igFollowers),
                               AppTheme.instagramPink,
-                              FontAwesomeIcons.instagram,
+                              FontAwesomeIcons.instagram.data,
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),

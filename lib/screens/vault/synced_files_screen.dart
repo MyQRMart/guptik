@@ -4,6 +4,7 @@ import 'package:guptik/models/mediaplyer/player_video_model.dart';
 import 'dart:math'; 
 import 'package:guptik/services/vault/sync_tracker.dart';
 import 'package:guptik/services/vault/vault_sync_service.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/utils/theme/dynamic_app_background.dart';
 import 'package:guptik/widgets/mediaplayer/mobile_video_player_widget.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -165,8 +166,8 @@ class _SyncedFilesScreenState extends State<SyncedFilesScreen> {
       String? publicUrl = await _syncService.getDesktopUrl();
       if (publicUrl == null) throw Exception("Desktop URL not found. Is your desktop synced?");
 
-      publicUrl = publicUrl.replaceAll('https://', '').replaceAll('http://', '');
-      if (publicUrl.endsWith('/')) publicUrl = publicUrl.substring(0, publicUrl.length - 1);
+      final base = NodeUrl.sanitize(publicUrl);
+      if (base.isEmpty) throw Exception("Desktop URL not found. Is your desktop synced?");
 
       final token = isPublic ? null : _generateSecureToken(32);
       final now = DateTime.now().toUtc();
@@ -181,7 +182,7 @@ class _SyncedFilesScreenState extends State<SyncedFilesScreen> {
       };
 
       final response = await http.post(
-        Uri.parse('https://$publicUrl/vault/share'),
+        Uri.parse('$base/vault/share'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(shareData),
       );
@@ -189,7 +190,7 @@ class _SyncedFilesScreenState extends State<SyncedFilesScreen> {
       if (response.statusCode != 200) throw Exception("Desktop rejected the share rule: ${response.body}");
 
       final safeName = Uri.encodeComponent(fileName);
-      String finalLink = "https://$publicUrl/vault/files/$safeName";
+      String finalLink = "$base/vault/files/$safeName";
       if (!isPublic && token != null) finalLink += "?token=$token";
 
       await Clipboard.setData(ClipboardData(text: finalLink));
@@ -651,6 +652,7 @@ class _MobileSystemFolderScreenState extends State<MobileSystemFolderScreen> {
                         final item = _folderItems[index];
                         final bool isSticker = item['is_sticker'] == true;
                         final bool isRepost = widget.folderType == 'repost';
+                        final bool isVaultFile = widget.folderType == 'vault_sys' || item['is_file'] == true;
                         // 🚀 FIX: for stickers, always prefer the REAL video's
                         // title/channel (now returned by the gateway via a
                         // JOIN) instead of the sticker's own product name and
@@ -699,6 +701,25 @@ class _MobileSystemFolderScreenState extends State<MobileSystemFolderScreen> {
 
                         return InkWell(
                           onTap: () {
+                            if (isVaultFile) {
+                              final name = (item['name'] ?? item['title'] ?? '').toString();
+                              final fileUrl = '${NodeUrl.sanitize(widget.desktopUrl)}/vault/files/${Uri.encodeComponent(name)}';
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => Scaffold(
+                                    backgroundColor: Colors.black,
+                                    appBar: AppBar(backgroundColor: Colors.black, title: Text(name, style: const TextStyle(color: Colors.white))),
+                                    body: Center(
+                                      child: InteractiveViewer(
+                                        child: Image.network(fileUrl, errorBuilder: (_, __, ___) => const Icon(Icons.insert_drive_file, color: Colors.white54, size: 64)),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
                             Navigator.push(
                               context,
                               MaterialPageRoute(

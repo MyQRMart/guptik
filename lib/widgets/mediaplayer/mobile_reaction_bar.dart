@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:guptik/models/mediaplyer/player_video_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../services/mediaplayer/mobile_bridge_service.dart';
-import '../../services/vault/vault_sync_service.dart';
+import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/vault/vault_sync_service.dart';
 import '../../screens/mediaplayer/mobile_profile_screen.dart';
 
 class MobileReactionBar extends StatefulWidget {
@@ -51,13 +52,12 @@ class _MobileReactionBarState extends State<MobileReactionBar> {
   }
 
   void _handleReaction(String type) async {
-    bool success = await _bridge.postReaction(widget.video.videoId, widget.video.creatorUid, type);
+    HapticFeedback.lightImpact();
+    setState(() => _currentLikes += 1);
+    final success = await _bridge.postReaction(widget.video.videoId, widget.video.creatorUid, type);
     if (!mounted) return;
-    if (success) {
-      setState(() => _currentLikes += 1);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Reacted ($type)!")));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Already reacted!")));
+    if (!success) {
+      setState(() => _currentLikes = (_currentLikes - 1).clamp(0, 1 << 30));
     }
   }
 
@@ -169,11 +169,20 @@ class _MobileReactionBarState extends State<MobileReactionBar> {
 
   void _handleSave() async {
     if (_isSaved) return;
-    bool success = await _bridge.saveVideo(widget.video.videoId, widget.video.creatorUid);
+    final mine = await NodeUrl.resolveMine();
+    if (!mounted) return;
+    if (mine == null || mine.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your desktop is offline. Pair it to save here.')),
+      );
+      return;
+    }
+    final mineBridge = MobileBridgeService(gatewayUrl: mine);
+    final success = await mineBridge.saveVideo(widget.video.videoId, widget.video.creatorUid);
     if (!mounted) return;
     if (success) {
       setState(() => _isSaved = true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved to your Vault!")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved on your node.')));
     }
   }
 

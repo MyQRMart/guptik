@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:guptik/models/whatsapp/wa_message.dart';
 import 'package:guptik/services/whatsapp/wa_conversation_service.dart';
 import 'package:guptik/services/whatsapp/wa_message_service.dart';
+import 'package:guptik/services/node/social_reply_service.dart';
 import 'package:guptik/widgets/whatsapp/chatwidgets/attachment_menu.dart';
 import 'package:guptik/widgets/whatsapp/chatwidgets/chat_info_dialog.dart';
 import 'package:guptik/widgets/whatsapp/chatwidgets/message_bubble.dart';
@@ -218,6 +219,35 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (mounted) {
         setState(() => _isSending = false);
       }
+    }
+  }
+
+  Future<void> _draftLocal() async {
+    Message? lastIn;
+    for (final m in _messages.reversed) {
+      if (m.direction == 'incoming') {
+        lastIn = m;
+        break;
+      }
+    }
+    final inbound = lastIn?.content ?? '';
+    if (inbound.isEmpty) return;
+    try {
+      final draft = await SocialReplyService().draft(
+        platform: 'whatsapp',
+        kind: 'message',
+        text: inbound,
+      );
+      if (!mounted) return;
+      if (draft == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Turn on this PC’s AI model first.')),
+        );
+        return;
+      }
+      _messageController.text = draft;
+    } catch (e) {
+      if (mounted) _showError('$e');
     }
   }
 
@@ -873,6 +903,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
 
                     const SizedBox(width: 8.0),
+
+                    IconButton(
+                      icon: const Icon(Icons.auto_awesome),
+                      tooltip: 'Draft with this PC’s model',
+                      onPressed: _draftLocal,
+                    ),
 
                     Container(
                       decoration: BoxDecoration(

@@ -9,7 +9,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart'; 
 import 'package:http/http.dart' as http; 
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart'; 
-import '../../services/trustme/trust_me_service.dart'; 
+import '../../services/trustme/trust_me_service.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart'; 
 import 'package:guptik/utils/theme/dynamic_app_background.dart';
 
 // Ancient Gold Theme Constants
@@ -63,7 +64,8 @@ class _MobileActiveChatScreenState extends State<MobileActiveChatScreen> {
   int _previousMessageCount = 0; 
   bool _isUploading = false; 
 
-  String _displayName = ''; 
+  String _displayName = '';
+  String _peerUrl = ''; 
   
   // Tracks which message we are currently editing
   String? _editingMessageId; 
@@ -95,7 +97,9 @@ class _MobileActiveChatScreenState extends State<MobileActiveChatScreen> {
       final contact = await TrustMeService.instance.getContactForConversation(widget.chat.id);
       if (contact != null && contact['url'] != null) {
         var url = contact['url'].toString();
-        if (!url.startsWith('http')) url = 'https://$url'; 
+        url = NodeUrl.sanitize(url);
+        if (url.isNotEmpty) _peerUrl = url;
+        if (!url.startsWith('http')) url = 'https://$url';
         final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
         if (mounted) setState(() => widget.chat.isOnline = (res.statusCode == 200));
       }
@@ -623,7 +627,11 @@ class _MobileActiveChatScreenState extends State<MobileActiveChatScreen> {
     final isMe = msg['isMe'] as bool; 
     final type = msg['type'] as String; 
     final time = msg['time'] as DateTime; 
-    final ipBase = TrustMeService.instance.gatewayUrl; 
+    final raw = msg['content']?.toString() ?? '';
+    final mine = TrustMeService.instance.gatewayUrl;
+    final ipBase = (!isMe && raw.startsWith('[vault]') && _peerUrl.isNotEmpty)
+        ? _peerUrl
+        : mine; 
 
     Widget content;
     if (type == 'deleted') content = _buildDeletedBubble();

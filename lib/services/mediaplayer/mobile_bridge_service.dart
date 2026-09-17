@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:guptik/models/mediaplyer/player_video_model.dart';
-import 'package:guptik/models/mediaplyer/player_comment_model.dart'; // 🚀 ADDED
+import 'package:guptik/models/mediaplyer/player_comment_model.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/mediaplayer/live_node_feed.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,29 +14,7 @@ class MobileBridgeService {
   MobileBridgeService({required this.gatewayUrl});
 
  String get _cleanGateway {
-    String url = gatewayUrl.trim();
-    
-    // Auto-swap old IP if present
-    if (url.contains('192.168.1.15')) {
-      url = url.replaceAll('192.168.1.15', '192.168.1.186');
-    }
-
-    // Force http:// for local network IPs and localhost
-    if (url.contains('192.168.') || url.contains('10.0.') || url.contains('127.0.0.1') || url.contains('localhost')) {
-      url = url.replaceAll('https://', '').replaceAll('http://', '');
-      url = 'http://$url';
-    } else {
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://$url';
-      }
-    }
-
-    // Enforce port 55000 for local network nodes if missing
-    if ((url.contains('192.168.') || url.contains('10.0.') || url.contains('127.0.0.1')) && !url.contains(':55000')) {
-      url = '$url:55000';
-    }
-
-    return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    return NodeUrl.sanitize(gatewayUrl);
   }
   
   Future<List<PlayerVideo>> getRemoteFeed() async {
@@ -64,7 +44,7 @@ class MobileBridgeService {
         }
       }
 
-      return allVideos.map((v) {
+      final mapped = allVideos.map((v) {
         if (v['repost_id'] != null) {
           final orig = originalVideosMap[v['repost_id'].toString()];
           if (orig != null) {
@@ -80,6 +60,7 @@ class MobileBridgeService {
         final nodeUrl = v['creator_cloudflare_url'] ?? _cleanGateway;
         return PlayerVideo.fromJson(v, nodeUrl);
       }).toList();
+      return LiveNodeFeed.onlyLive(mapped);
       
     } catch (e) {
       debugPrint("Bridge Feed Error: $e");
@@ -324,7 +305,12 @@ class MobileBridgeService {
       final response = await http.post(
         Uri.parse('$_cleanGateway/player/video/save'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'video_id': videoId, 'creator_uid': creatorUid}),
+        body: jsonEncode({
+          'video_id': videoId,
+          'creator_uid': creatorUid,
+          'viewer_uid': Supabase.instance.client.auth.currentUser?.id,
+          'folder_name': 'Watch Later',
+        }),
       );
       return response.statusCode == 200;
     } catch (e) {
@@ -481,6 +467,162 @@ class MobileBridgeService {
     } catch (e) {
       debugPrint('Profile Fetch Error: $e');
       return null;
+    }
+  }
+
+  Future<bool> logWatchHistory({
+    required String videoId,
+    required String creatorUid,
+    required int durationSeconds,
+    required double percentCompleted,
+    required String sessionId,
+    String? channelId,
+  }) async {
+    if (_cleanGateway.isEmpty) return false;
+    try {
+      final response = await http.post(
+        Uri.parse('$_cleanGateway/player/video/history'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'video_id': videoId,
+          'creator_uid': creatorUid,
+          'channel_id': channelId ?? creatorUid,
+          'watch_duration_seconds': durationSeconds,
+          'percent_completed': percentCompleted,
+          'session_id': sessionId,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('History log error: $e');
+      return false;
+    }
+  }
+
+  Future<List<PlayerVideo>> fetchHistoryList() async =>
+      _fetchNodeVideoList('/player/video/history/list');
+
+  Future<List<PlayerVideo>> fetchSavedList() async =>
+      _fetchNodeVideoList('/player/video/saved/list');
+
+  Future<List<PlayerVideo>> _fetchNodeVideoList(String path) async {
+    if (_cleanGateway.isEmpty) return [];
+    try {
+      final response = await http.get(Uri.parse('$_cleanGateway$path'));
+      if (response.statusCode != 200) return [];
+      final List data = jsonDecode(response.body) as List;
+      final parsed = data
+          .map((v) => PlayerVideo.fromJson(
+                Map<String, dynamic>.from(v as Map),
+                _cleanGateway,
+              ))
+          .toList();
+      return _hydrateFromDirectory(parsed);
+    } catch (e) {
+      debugPrint('Node list $path error: $e');
+      return [];
+    }
+  }
+
+  Future<List<PlayerVideo>> _hydrateFromDirectory(List<PlayerVideo> videos) async {
+    final missing = videos
+        .where((v) => v.title.isEmpty || v.title == 'Untitled Broadcast')
+        .map((v) => v.videoId)
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (missing.isEmpty) return videos;
+    try {
+      final rows = await Supabase.instance.client
+          .from('mp_videos')
+          .select()
+          .filter('video_id', 'in', missing);
+      final map = <String, Map<String, dynamic>>{};
+      for (final row in rows as List) {
+        final m = Map<String, dynamic>.from(row as Map);
+        map[m['video_id'].toString()] = m;
+      }
+      return videos.map((v) {
+        final extra = map[v.videoId];
+        if (extra == null || v.title.isNotEmpty) return v;
+        final node = extra['creator_cloudflare_url']?.toString() ?? _cleanGateway;
+        return PlayerVideo.fromJson(extra, NodeUrl.sanitize(node));
+      }).toList();
+    } catch (e) {
+      debugPrint('Hydrate directory error: $e');
+      return videos;
+    }
+  }
+
+  Future<bool> checkSubscription({
+    required String channelId,
+    required String subscriberUid,
+  }) async {
+    if (_cleanGateway.isEmpty) return false;
+    try {
+      final response = await http.get(
+        Uri.parse('$_cleanGateway/channel/subscribe/status/$channelId/$subscriberUid'),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['is_subscribed'] == true;
+      }
+    } catch (e) {
+      debugPrint('Sub check error: $e');
+    }
+    return false;
+  }
+
+  Future<bool?> toggleSubscription({
+    required String channelId,
+    required String subscriberUid,
+  }) async {
+    if (_cleanGateway.isEmpty) return null;
+    try {
+      final response = await http.post(
+        Uri.parse('$_cleanGateway/channel/subscribe/toggle'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'channel_id': channelId,
+          'subscriber_uid': subscriberUid,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['is_subscribed'] == true;
+      }
+    } catch (e) {
+      debugPrint('Sub toggle error: $e');
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPlaylists(String channelId) async {
+    if (_cleanGateway.isEmpty) return [];
+    try {
+      final response = await http.get(
+        Uri.parse('$_cleanGateway/player/playlists?channel_id=$channelId'),
+      );
+      if (response.statusCode != 200) return [];
+      return (jsonDecode(response.body) as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (e) {
+      debugPrint('Playlists fetch error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchDrafts(String channelId) async {
+    if (_cleanGateway.isEmpty) return [];
+    try {
+      final response = await http.get(
+        Uri.parse('$_cleanGateway/player/drafts?channel_id=$channelId'),
+      );
+      if (response.statusCode != 200) return [];
+      return (jsonDecode(response.body) as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (e) {
+      debugPrint('Drafts fetch error: $e');
+      return [];
     }
   }
 }

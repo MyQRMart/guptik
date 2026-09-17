@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:guptik/services/whatsapp/wa_template_WhatsAppApiService.dart';
-import 'package:guptik/utils/whastapp%20templates/helpers.dart';
+import 'package:guptik/utils/whastapp templates/helpers.dart';
 import '../../models/whatsapp/template.dart';
 
 class SendTemplateScreen extends StatefulWidget {

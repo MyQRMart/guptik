@@ -180,7 +180,7 @@ class _DesktopPairingScreenState extends State<DesktopPairingScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            "Open the GupTik Desktop App and scan the QR code to sync your server settings.",
+            "Sign in to GupTik Desktop with the same email. It will show up here automatically. QR is optional.",
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey[400], fontSize: 15, height: 1.5),
           ),
@@ -244,7 +244,7 @@ class _DesktopPairingScreenState extends State<DesktopPairingScreen> {
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: Text(
-                "ID: ${_connectedDevice?['device_id']}",
+                "${_connectedDevice?['status'] ?? ''}  ·  ${_connectedDevice?['public_url'] ?? 'waiting for URL'}\nID: ${_connectedDevice?['device_id']}",
                 style: TextStyle(color: Colors.grey[500], fontSize: 12, fontFamily: 'monospace'),
               ),
             ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:guptik/screens/dashboard/contact_people_page.dart';
+import 'package:guptik/services/contacts/device_contacts_service.dart';
 import 'package:guptik/utils/theme/dynamic_app_background.dart';
 
 
@@ -15,9 +17,24 @@ class ContactListsScreen extends StatefulWidget {
 
 class _ContactListsScreenState extends State<ContactListsScreen> {
   final TextEditingController _searchController = TextEditingController();
-  
-  // Contact lists data - starts empty
-  final List<Map<String, dynamic>> _contactLists = [];
+  List<Map<String, dynamic>> _contactLists = [];
+  bool _loadingGroups = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGroups();
+  }
+
+  Future<void> _loadGroups() async {
+    setState(() => _loadingGroups = true);
+    final groups = await DeviceContactsService().loadGroups();
+    if (!mounted) return;
+    setState(() {
+      _contactLists = groups;
+      _loadingGroups = false;
+    });
+  }
 
   List<Map<String, dynamic>> get _filteredLists {
     if (_searchController.text.isEmpty) return _contactLists;
@@ -138,7 +155,9 @@ class _ContactListsScreenState extends State<ContactListsScreen> {
                 
                 // Lists Grid/List
                 Expanded(
-                  child: _filteredLists.isEmpty
+                  child: _loadingGroups
+                      ? const Center(child: CircularProgressIndicator(color: _ancientGold))
+                      : _filteredLists.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
@@ -529,43 +548,17 @@ class _ContactListsScreenState extends State<ContactListsScreen> {
               child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
             ),
             ElevatedButton(
-              onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  this.setState(() {
-                    if (editingList != null) {
-                      final index = _contactLists.indexWhere((list) => list['id'] == editingList['id']);
-                      if (index != -1) {
-                        _contactLists[index] = {
-                          ..._contactLists[index],
-                          'name': nameController.text,
-                          'description': descriptionController.text,
-                          'is_active': isActive,
-                          'updated_date': DateTime.now().toString().split(' ')[0],
-                        };
-                      }
-                    } else {
-                      _contactLists.add({
-                        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                        'name': nameController.text,
-                        'description': descriptionController.text,
-                        'is_active': isActive,
-                        'contact_count': 0,
-                        'created_date': DateTime.now().toString().split(' ')[0],
-                        'updated_date': DateTime.now().toString().split(' ')[0],
-                      });
-                    }
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        editingList != null ? 'List updated successfully' : 'List created successfully',
-                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      ),
-                      backgroundColor: Colors.greenAccent,
-                    ),
-                  );
-                }
+              onPressed: () async {
+                if (nameController.text.isEmpty) return;
+                final name = nameController.text.trim();
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                if (editingList != null) return;
+                final ok = await DeviceContactsService().createGroup(name);
+                messenger.showSnackBar(SnackBar(
+                  content: Text(ok ? 'List created on this phone.' : 'Could not create list.'),
+                ));
+                if (ok && mounted) _loadGroups();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _ancientGold,
@@ -579,13 +572,12 @@ class _ContactListsScreenState extends State<ContactListsScreen> {
     );
   }
 
-  void _viewListContacts(Map<String, dynamic> list) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('View contacts in "${list['name']}" - Coming soon!', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        backgroundColor: _ancientGold,
-      ),
-    );
+  Future<void> _viewListContacts(Map<String, dynamic> list) async {
+    final id = list['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    final people = await DeviceContactsService().loadGroupMembers(id);
+    if (!mounted) return;
+    openPeople(context, list['name']?.toString() ?? 'List', people);
   }
 
   void _editList(Map<String, dynamic> list) {

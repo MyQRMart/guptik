@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:guptik/models/mediaplyer/player_video_model.dart';
-import 'package:guptik/models/mediaplyer/player_comment_model.dart'; // 🚀 ADDED
+import 'package:guptik/models/mediaplyer/player_comment_model.dart';
 import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'mobile_reaction_bar.dart';
@@ -110,32 +111,12 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget> {
 
     _fetchRecommendations();
 
-   // 3. Establishes the video streaming link with robust local network sanitization
-    String cleanGateway = widget.video.creatorUrl.trim();
-    
-    if (cleanGateway.contains('192.168.1.15')) {
-      cleanGateway = cleanGateway.replaceAll('192.168.1.15', '192.168.1.186');
+    final String cleanGateway = NodeUrl.sanitize(widget.video.creatorUrl);
+    if (cleanGateway.isEmpty) {
+      if (mounted) setState(() => _hasError = true);
+      return;
     }
 
-    if (cleanGateway.contains('192.168.') || cleanGateway.contains('10.0.') || cleanGateway.contains('127.0.0.1') || cleanGateway.contains('localhost')) {
-      cleanGateway = cleanGateway.replaceAll('https://', 'http://');
-      if (!cleanGateway.startsWith('http://')) {
-        cleanGateway = 'http://$cleanGateway';
-      }
-    } else {
-      if (!cleanGateway.startsWith('http')) {
-        cleanGateway = 'https://$cleanGateway';
-      }
-    }
-
-    if (cleanGateway.endsWith('/')) {
-      cleanGateway = cleanGateway.substring(0, cleanGateway.length - 1);
-    }
-    
-    if ((cleanGateway.contains('192.168.') || cleanGateway.contains('10.0.') || cleanGateway.contains('127.0.0.1')) && !cleanGateway.contains(':55000')) {
-      cleanGateway = '$cleanGateway:55000';
-    }
-    
     final String fullStreamUrl = '$cleanGateway/player/video/stream/${widget.video.videoId}';
     
     debugPrint("📱 Mobile attempting to stream channel: $fullStreamUrl");
@@ -166,8 +147,31 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget> {
 
   @override
   void dispose() {
+    int position = 0;
+    int duration = 0;
+    final c = _controller;
+    if (c != null && c.value.isInitialized) {
+      position = c.value.position.inSeconds;
+      duration = c.value.duration.inSeconds;
+    }
     _controller?.dispose();
     super.dispose();
+    _logHistoryToMyNode(position, duration);
+  }
+
+  Future<void> _logHistoryToMyNode(int position, int duration) async {
+    if (position <= 0 && duration <= 0) return;
+    final percent = duration > 0 ? (position / duration) * 100 : 0.0;
+    final mine = await NodeUrl.resolveMine();
+    if (mine == null || mine.isEmpty) return;
+    await MobileBridgeService(gatewayUrl: mine).logWatchHistory(
+      videoId: widget.video.videoId,
+      creatorUid: widget.video.creatorUid,
+      channelId: widget.video.channelId,
+      durationSeconds: position,
+      percentCompleted: percent,
+      sessionId: 'mobile_session_${DateTime.now().millisecondsSinceEpoch}',
+    );
   }
 
   void _togglePlay() {
@@ -536,32 +540,7 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget> {
                 itemCount: _recommendedVideos.length,
                 itemBuilder: (ctx, idx) {
                   final rec = _recommendedVideos[idx];
-                  
-                  // Clean URL for thumbnails
-                  String cleanUrl = rec.creatorUrl.trim();
-                  if (cleanUrl.contains('192.168.1.15')) {
-                    cleanUrl = cleanUrl.replaceAll('192.168.1.15', '192.168.1.186');
-                  }
-
-                  if (cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1') || cleanUrl.contains('localhost')) {
-                    cleanUrl = cleanUrl.replaceAll('https://', 'http://');
-                    if (!cleanUrl.startsWith('http://')) {
-                      cleanUrl = 'http://$cleanUrl';
-                    }
-                  } else {
-                    if (!cleanUrl.startsWith('http')) {
-                      cleanUrl = 'https://$cleanUrl';
-                    }
-                  }
-
-                  if (cleanUrl.endsWith('/')) {
-                    cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
-                  }
-
-                  if ((cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1')) && !cleanUrl.contains(':55000')) {
-                    cleanUrl = '$cleanUrl:55000';
-                  }
-
+                  final cleanUrl = NodeUrl.sanitize(rec.creatorUrl);
                   final itemThumbUrl = '$cleanUrl/player/video/thumbnail/${rec.videoId}';
                   
                   return ListTile(

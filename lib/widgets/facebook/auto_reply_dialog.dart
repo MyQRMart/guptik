@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:guptik/models/facebook/meta_content_model.dart';
+import 'package:guptik/services/node/node_table_client.dart';
+import 'package:guptik/services/node/social_reply_service.dart';
+import 'package:guptik/widgets/facebook/local_model_toggle.dart';
 
 class AutoReplyDialog extends StatefulWidget {
   final String postId;
@@ -20,6 +23,7 @@ class AutoReplyDialog extends StatefulWidget {
 class _AutoReplyDialogState extends State<AutoReplyDialog> {
   bool _isLoading = true;
   bool _isSaving = false;
+  final _store = NodeTableClient();
 
   // Form Controllers
   final TextEditingController _keywordController = TextEditingController();
@@ -74,11 +78,7 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
 
     // 2. Fetch Existing Post Config
     try {
-      final response = await Supabase.instance.client
-          .from(configTableName)
-          .select()
-          .eq('post_id', widget.postId)
-          .maybeSingle();
+      final response = await _store.maybeSingle(configTableName, {'post_id': widget.postId});
 
       if (response != null) {
         Map<String, dynamic> autoReplyData = {};
@@ -123,11 +123,12 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
   Future<void> _fetchCommentsForPost(String commentsTableName) async {
     setState(() => _isLoadingComments = true);
     try {
-      final commentsResponse = await Supabase.instance.client
-          .from(commentsTableName)
-          .select('sender_name, context, direction')
-          .eq('post_id', widget.postId)
-          .order('created_at', ascending: false);
+      final commentsResponse = await _store.select(
+        commentsTableName,
+        eq: {'post_id': widget.postId},
+        order: 'created_at',
+        ascending: false,
+      );
 
       setState(() {
         _postComments = List<Map<String, dynamic>>.from(commentsResponse);
@@ -159,17 +160,13 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
 
     try {
       if (_autoCommentStatus == 'X') {
-        await Supabase.instance.client
-            .from(configTableName)
-            .delete()
-            .eq('post_id', widget.postId);
+        await _store.delete(configTableName, {'post_id': widget.postId});
       } else {
         final autoReplyJson = {
           "keywords": _keywordController.text.trim(),
           "respond": _dmResponseController.text.trim(),
         };
-
-        await Supabase.instance.client.from(configTableName).upsert({
+        final row = {
           'user_id': userId,
           'post_id': widget.postId,
           'auto_reply': autoReplyJson,
@@ -179,7 +176,13 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
           'all_comments': _allComments,
           'ai_agent_id': _selectedAiAgentId,
           'updated_at': DateTime.now().toIso8601String(),
-        }, onConflict: 'post_id');
+        };
+        final existing = await _store.maybeSingle(configTableName, {'post_id': widget.postId});
+        if (existing == null) {
+          await _store.insert(configTableName, row);
+        } else {
+          await _store.update(configTableName, eq: {'post_id': widget.postId}, set: row);
+        }
       }
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -288,10 +291,43 @@ class _AutoReplyDialogState extends State<AutoReplyDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            const LocalModelToggle(),
+            const SizedBox(height: 8),
             _buildTextField("Keyword Secret", _keywordController),
             _buildTextField("DM Response", _dmResponseController, lines: 2),
             _buildTextField("Comment Reply", _commentReplyController, lines: 2),
             _buildTextField("AI Agent Prompt", _aiPromptController, lines: 2),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () async {
+                  final inbound = _keywordController.text.trim().isEmpty
+                      ? 'A customer commented on this post.'
+                      : _keywordController.text.trim();
+                  try {
+                    final draft = await SocialReplyService().draft(
+                      platform: widget.platform == SocialPlatform.instagram ? 'instagram' : 'facebook',
+                      kind: 'comment',
+                      text: inbound,
+                      extraPrompt: _aiPromptController.text.trim(),
+                    );
+                    if (draft != null && mounted) {
+                      _commentReplyController.text = draft;
+                    } else if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Turn on “this PC’s AI model” first.')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                    }
+                  }
+                },
+                icon: const Icon(Icons.auto_awesome, size: 16),
+                label: const Text('Draft with local model'),
+              ),
+            ),
 
             const SizedBox(height: 10),
             const Text(

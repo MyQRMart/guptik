@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:guptik/screens/dashboard/message_templates_screen.dart';
-import 'package:guptik/screens/home/home_screen.dart';
+import 'package:guptik/screens/Home/home_screen.dart';
 import 'package:guptik/screens/profilepopup/whatsapp_web_screen.dart';
 
 class DeepLinkNavigator {

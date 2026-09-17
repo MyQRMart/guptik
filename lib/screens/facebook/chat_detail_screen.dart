@@ -1,12 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:guptik/models/facebook/meta_chat_model.dart';
 import 'package:guptik/models/facebook/meta_content_model.dart';
 import 'package:guptik/services/facebook/meta_service.dart';
 import 'package:guptik/services/facebook/message_storage_service.dart';
+import 'package:guptik/services/node/social_reply_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:guptik/config/app_theme.dart';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -27,80 +28,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  RealtimeChannel? _realtimeChannel;
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
-    _subscribeToNewMessages();
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && !_isSending) _loadMessages(silent: true);
+    });
   }
 
   @override
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
-    _realtimeChannel?.unsubscribe();
+    _poll?.cancel();
     super.dispose();
   }
 
-  void _subscribeToNewMessages() {
-    final table = widget.conversation.platform == SocialPlatform.facebook
-        ? 'fb_messages'
-        : 'ig_messages';
-
-    _realtimeChannel = Supabase.instance.client
-        .channel('messages-${widget.conversation.id}')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: table,
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'conversation_id',
-            value: widget.conversation.supabaseId,
-          ),
-          callback: (payload) {
-            final newMessage = payload.newRecord;
-            final message = {
-              'id': newMessage['message_id'],
-              'message': newMessage['content'],
-              'is_from_me':
-                  newMessage['direction'] == 'outgoing' ||
-                  newMessage['direction'] == 'ai_outgoing',
-              'created_time': newMessage['timestamp'],
-              'message_id': newMessage['message_id'],
-              'content': newMessage['content'],
-              'message_type': newMessage['message_type'],
-              'direction': newMessage['direction'],
-              'timestamp': newMessage['timestamp'],
-              'media_info': newMessage['media_info'],
-              'raw_data': newMessage['raw_data'],
-            };
-
-            if (!_messages.any(
-              (m) => m['message_id'] == message['message_id'],
-            )) {
-              if (mounted) {
-                setState(() {
-                  _messages.add(message);
-                  _messages.sort((a, b) {
-                    final timeA = DateTime.parse(a['created_time']);
-                    final timeB = DateTime.parse(b['created_time']);
-                    return timeA.compareTo(timeB);
-                  });
-                });
-                _scrollToBottom();
-              }
-            }
-          },
-        )
-        .subscribe();
-  }
-
-  Future<void> _loadMessages() async {
+  Future<void> _loadMessages({bool silent = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (!silent) setState(() => _isLoading = true);
 
     try {
       final storedMessages = await _storageService.getMessages(
@@ -226,6 +175,34 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _draftLocal() async {
+    final last = _messages.reversed.firstWhere(
+      (m) => m['is_from_me'] != true,
+      orElse: () => {},
+    );
+    final inbound = (last['message'] ?? last['content'] ?? '').toString();
+    if (inbound.isEmpty) return;
+    try {
+      final draft = await SocialReplyService().draft(
+        platform: widget.conversation.platform == SocialPlatform.instagram ? 'instagram' : 'facebook',
+        kind: 'message',
+        text: inbound,
+      );
+      if (!mounted) return;
+      if (draft == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Turn on this PC’s AI model first.')),
+        );
+        return;
+      }
+      _textController.text = draft;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
     }
   }
 
@@ -634,6 +611,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _sendMessage(),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Draft with this PC’s model',
+            onPressed: _draftLocal,
           ),
           const SizedBox(width: AppSpacing.md),
           Container(

@@ -230,7 +230,7 @@ class _AnimatedSwitchIconState extends State<AnimatedSwitchIcon>
       case SwitchType.light:
         return Icons.lightbulb;
       case SwitchType.fan:
-        return FontAwesomeIcons.fan;
+        return FontAwesomeIcons.fan.data;
       case SwitchType.ac:
         return Icons.ac_unit;
       case SwitchType.heater:

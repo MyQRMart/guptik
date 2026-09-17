@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:guptik/models/mediaplyer/player_video_model.dart';
 import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/widgets/mediaplayer/mobile_video_player_widget.dart';
+import 'package:guptik/screens/mediaplayer/mobile_library_screen.dart';
 
 class MobileProfileScreen extends StatefulWidget {
   final String channelId;
@@ -22,6 +24,9 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
   bool _isLoading = true;
   int _selectedTabIndex = 0; // 0 = Videos, 1 = Shorts
   late String _resolvedNodeUrl;
+  bool _isOwnChannel = false;
+  bool _isSubscribed = false;
+  bool _togglingSub = false;
 
   @override
   void initState() {
@@ -34,61 +39,36 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 🚀 1. SELF-HEALING TUNNEL RESOLUTION:
-      if (_resolvedNodeUrl.isEmpty || _resolvedNodeUrl.contains('myqrmart.com')) {
+      _resolvedNodeUrl = NodeUrl.sanitize(_resolvedNodeUrl);
+      if (_resolvedNodeUrl.isEmpty || _resolvedNodeUrl.contains('guptik.myqrmart.com') && !_resolvedNodeUrl.contains('-guptik.myqrmart.com')) {
         try {
           final channelMeta = await Supabase.instance.client
               .from('mp_channels')
               .select('tunnel_url')
               .eq('channel_id', widget.channelId)
               .maybeSingle();
-
-          if (channelMeta != null && channelMeta['tunnel_url'] != null) {
-            String dbTunnel = channelMeta['tunnel_url'].toString().trim();
-            
-            // Auto-swap old IP if present
-            if (dbTunnel.contains('192.168.1.15')) {
-              dbTunnel = dbTunnel.replaceAll('192.168.1.15', '192.168.1.186');
-            }
-
-            if (dbTunnel.contains('192.168.') || dbTunnel.contains('10.0.') || dbTunnel.contains('127.0.0.1') || dbTunnel.contains('localhost')) {
-              dbTunnel = dbTunnel.replaceAll('https://', 'http://');
-              if (!dbTunnel.startsWith('http://')) {
-                dbTunnel = 'http://$dbTunnel';
-              }
-            } else {
-              if (!dbTunnel.startsWith('http')) {
-                dbTunnel = 'https://$dbTunnel';
-              }
-            }
-
-            if (dbTunnel.endsWith('/')) {
-              dbTunnel = dbTunnel.substring(0, dbTunnel.length - 1);
-            }
-
-            // Force port 55000 if it's missing on local IPs
-            if ((dbTunnel.contains('192.168.') || dbTunnel.contains('10.0.') || dbTunnel.contains('127.0.0.1')) && !dbTunnel.contains(':55000')) {
-              dbTunnel = '$dbTunnel:55000';
-            }
-            _resolvedNodeUrl = dbTunnel;
-          }
+          _resolvedNodeUrl = NodeUrl.sanitize(channelMeta?['tunnel_url']?.toString());
         } catch (dbErr) {
-          debugPrint("⚠️ Tunnel lookup fallback warning: $dbErr");
+          debugPrint("Tunnel lookup warning: $dbErr");
         }
       }
 
-      // Final fallback if local testing or unmapped node
       if (_resolvedNodeUrl.isEmpty) {
-        _resolvedNodeUrl = 'http://192.168.1.186:55000';
+        if (mounted) setState(() => _isLoading = false);
+        return;
       }
 
       _bridge = MobileBridgeService(gatewayUrl: _resolvedNodeUrl);
+      final me = Supabase.instance.client.auth.currentUser?.id;
+      _isOwnChannel = me != null && (me == widget.channelId);
 
-      // 2. Fetch Profile & Videos in parallel safely
       final profileFuture = _bridge.fetchChannelProfile(widget.channelId);
       final videosFuture = _bridge.fetchChannelVideos(_resolvedNodeUrl, widget.channelId);
+      final subFuture = (!_isOwnChannel && me != null)
+          ? _bridge.checkSubscription(channelId: widget.channelId, subscriberUid: me)
+          : Future.value(false);
 
-      final results = await Future.wait([profileFuture, videosFuture]);
+      final results = await Future.wait([profileFuture, videosFuture, subFuture]);
 
       if (mounted) {
         setState(() {
@@ -96,6 +76,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
           final List<PlayerVideo> allVideos = results[1] as List<PlayerVideo>;
           _reels = allVideos.where((v) => v.isReel).toList();
           _normalVideos = allVideos.where((v) => !v.isReel).toList();
+          _isSubscribed = results[2] as bool;
           _isLoading = false;
         });
       }
@@ -111,6 +92,21 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
     if (views >= 1000000) return '${(views / 1000000).toStringAsFixed(1)}M';
     if (views >= 1000) return '${(views / 1000).toStringAsFixed(1)}K';
     return views.toString();
+  }
+
+  Future<void> _toggleSubscribe() async {
+    final me = Supabase.instance.client.auth.currentUser?.id;
+    if (me == null) return;
+    setState(() => _togglingSub = true);
+    final next = await _bridge.toggleSubscription(
+      channelId: widget.channelId,
+      subscriberUid: me,
+    );
+    if (!mounted) return;
+    setState(() {
+      _togglingSub = false;
+      if (next != null) _isSubscribed = next;
+    });
   }
 
   @override
@@ -171,21 +167,104 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 40,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subscription coming soon!')));
-                      },
-                      child: const Text('Subscribe', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  if (_isOwnChannel) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MobileLibraryScreen(
+                                    mode: 'history',
+                                    nodeUrl: _resolvedNodeUrl,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('History'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MobileLibraryScreen(
+                                    mode: 'saved',
+                                    nodeUrl: _resolvedNodeUrl,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('Watch Later'),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MobileLibraryScreen(
+                                    mode: 'playlists',
+                                    nodeUrl: _resolvedNodeUrl,
+                                    channelId: widget.channelId,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('Playlists'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MobileLibraryScreen(
+                                    mode: 'drafts',
+                                    nodeUrl: _resolvedNodeUrl,
+                                    channelId: widget.channelId,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('Drafts'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 40,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isSubscribed ? Colors.grey[800] : Colors.white,
+                          foregroundColor: _isSubscribed ? Colors.white : Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                        onPressed: _togglingSub ? null : _toggleSubscribe,
+                        child: Text(
+                          _togglingSub
+                              ? '…'
+                              : (_isSubscribed ? 'Subscribed' : 'Subscribe'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Row(
                     children: [
@@ -246,32 +325,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final video = activeList[index];
-                    
-                    // 🚀 Robust thumbnail URL sanitization
-                    String baseNodeUrl = _resolvedNodeUrl.trim();
-                    if (baseNodeUrl.contains('192.168.1.15')) {
-                      baseNodeUrl = baseNodeUrl.replaceAll('192.168.1.15', '192.168.1.186');
-                    }
-
-                    if (baseNodeUrl.contains('192.168.') || baseNodeUrl.contains('10.0.') || baseNodeUrl.contains('127.0.0.1') || baseNodeUrl.contains('localhost')) {
-                      baseNodeUrl = baseNodeUrl.replaceAll('https://', 'http://');
-                      if (!baseNodeUrl.startsWith('http://')) {
-                        baseNodeUrl = 'http://$baseNodeUrl';
-                      }
-                    } else {
-                      if (!baseNodeUrl.startsWith('http')) {
-                        baseNodeUrl = 'https://$baseNodeUrl';
-                      }
-                    }
-
-                    if (baseNodeUrl.endsWith('/')) {
-                      baseNodeUrl = baseNodeUrl.substring(0, baseNodeUrl.length - 1);
-                    }
-
-                    if ((baseNodeUrl.contains('192.168.') || baseNodeUrl.contains('10.0.') || baseNodeUrl.contains('127.0.0.1')) && !baseNodeUrl.contains(':55000')) {
-                      baseNodeUrl = '$baseNodeUrl:55000';
-                    }
-
+                    final baseNodeUrl = NodeUrl.sanitize(_resolvedNodeUrl);
                     final itemThumbUrl = '$baseNodeUrl/player/video/thumbnail/${video.videoId}';
 
                     return GestureDetector(

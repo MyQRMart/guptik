@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:guptik/screens/mediaplayer/Mobile_monetization_screen.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'mobile_home_loader.dart';
@@ -36,38 +37,7 @@ class _MobileMainLayoutState extends State<MobileMainLayout> {
   }
 
   String _getSanitizedGatewayUrl() {
-    String url = widget.gatewayUrl.trim();
-    
-    // Auto-correct old IP references from database records
-    if (url.contains('192.168.1.15')) {
-      url = url.replaceAll('192.168.1.15', '192.168.1.186');
-    }
-
-    if (url.isEmpty || url.contains('myqrmart.com')) {
-      return 'http://192.168.1.186:55000';
-    }
-    
-    if (url.contains('192.168.') || url.contains('10.0.') || url.contains('127.0.0.1') || url.contains('localhost')) {
-      url = url.replaceAll('https://', 'http://');
-      if (!url.startsWith('http://')) {
-        url = 'http://$url';
-      }
-    } else {
-      if (!url.startsWith('http')) {
-        url = 'https://$url';
-      }
-    }
-    
-    if (url.endsWith('/')) {
-      url = url.substring(0, url.length - 1);
-    }
-    
-    // Automatically enforce port 55000 for local network IPs if missing
-    if ((url.contains('192.168.') || url.contains('10.0.') || url.contains('127.0.0.1')) && !url.contains(':55000')) {
-      url = '$url:55000';
-    }
-    
-    return url;
+    return NodeUrl.sanitize(widget.gatewayUrl);
   }
 
   Future<void> _resolveActiveUserAndChannel() async {
@@ -123,10 +93,9 @@ class _MobileMainLayoutState extends State<MobileMainLayout> {
       debugPrint("⚠️ Channel resolution warning: $e");
     }
 
-    // 3. Ultimate Fallback: Default to the active local testing channel ID that holds your videos
     if (mounted) {
       setState(() {
-        _userChannelId = '93f468b5-6653-4103-8f5e-71b7b323b46e';
+        _userChannelId = _resolvedUserId.isNotEmpty ? _resolvedUserId : null;
         _isResolvingChannel = false;
       });
     }
@@ -149,8 +118,19 @@ class _MobileMainLayoutState extends State<MobileMainLayout> {
       );
     }
 
-    final effectiveChannelId = _userChannelId ?? '93f468b5-6653-4103-8f5e-71b7b323b46e';
+    final effectiveChannelId = _userChannelId ?? _resolvedUserId;
     final sanitizedNodeUrl = _getSanitizedGatewayUrl();
+    if (sanitizedNodeUrl.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'No desktop node URL. Pair your PC first.',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+    }
 
     // 🚀 Updated screens layout: Home (0), Shots (1), Upload (2), Profile (3), Earnings (4)
     final List<Widget> screens = [

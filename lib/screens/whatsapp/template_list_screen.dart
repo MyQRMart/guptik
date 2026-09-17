@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:guptik/models/whatsapp/template.dart';
 import 'package:guptik/services/whatsapp/wa_template_WhatsAppApiService.dart';
 import 'package:guptik/services/whatsapp/wa_template_service.dart';
-import 'package:guptik/utils/whastapp%20templates/helpers.dart';
+import 'package:guptik/utils/whastapp templates/helpers.dart';
 import 'template_form.dart';
 import 'send_template.dart';
 import 'preview_template.dart';

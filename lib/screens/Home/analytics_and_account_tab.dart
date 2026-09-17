@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+import 'package:guptik/widgets/home/node_connection_banner.dart';
+
 const Color _ancientGold = Color(0xFFD4AF37);
 
 class ResponsiveRow extends StatelessWidget {
@@ -56,6 +58,8 @@ class AnalyticsAndAccountTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const NodeConnectionBanner(),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(

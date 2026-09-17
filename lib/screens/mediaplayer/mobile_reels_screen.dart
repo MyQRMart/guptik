@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:guptik/models/mediaplyer/player_video_model.dart';
 import 'package:guptik/models/mediaplyer/player_comment_model.dart';
 import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/screens/mediaplayer/mobile_profile_screen.dart';
 
 /// MobileReelsScreen — a YouTube-Shorts / TikTok style, full-screen vertical
@@ -208,27 +210,7 @@ class _ReelPlayerPageState extends State<_ReelPlayerPage> {
   }
 
   String _sanitizeGateway(String raw) {
-    String cleanUrl = raw.trim();
-    if (cleanUrl.contains('192.168.1.15')) {
-      cleanUrl = cleanUrl.replaceAll('192.168.1.15', '192.168.1.186');
-    }
-    if (cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1') || cleanUrl.contains('localhost')) {
-      cleanUrl = cleanUrl.replaceAll('https://', 'http://');
-      if (!cleanUrl.startsWith('http://')) {
-        cleanUrl = 'http://$cleanUrl';
-      }
-    } else {
-      if (!cleanUrl.startsWith('http')) {
-        cleanUrl = 'https://$cleanUrl';
-      }
-    }
-    if (cleanUrl.endsWith('/')) {
-      cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
-    }
-    if ((cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1')) && !cleanUrl.contains(':55000')) {
-      cleanUrl = '$cleanUrl:55000';
-    }
-    return cleanUrl;
+    return NodeUrl.sanitize(raw);
   }
 
   Future<void> _initializePlayer() async {
@@ -287,15 +269,19 @@ class _ReelPlayerPageState extends State<_ReelPlayerPage> {
   }
 
   void _handleLike() async {
+    if (_hasLiked) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _hasLiked = true;
+      _liveLikes += 1;
+    });
     final success = await _bridge.postReaction(widget.video.videoId, widget.video.creatorUid, 'thumbs_up');
     if (!mounted) return;
-    if (success) {
+    if (!success) {
       setState(() {
-        _hasLiked = true;
-        _liveLikes += 1;
+        _hasLiked = false;
+        _liveLikes = (_liveLikes - 1).clamp(0, 1 << 30);
       });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Already reacted!")));
     }
   }
 
@@ -372,6 +358,7 @@ class _ReelPlayerPageState extends State<_ReelPlayerPage> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _togglePlay,
+      onDoubleTap: _handleLike,
       child: Container(
         color: Colors.black,
         width: double.infinity,

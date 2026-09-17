@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
 import 'package:guptik/models/mediaplyer/player_video_model.dart';
 import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/widgets/mediaplayer/mobile_video_player_widget.dart';
 import 'package:guptik/screens/mediaplayer/mobile_profile_screen.dart'; // 🚀 Added import for profile routing
 import 'package:guptik/screens/mediaplayer/mobile_reels_screen.dart'; // 🚀 ADDED: YouTube-style Shorts carousel opens the full reels feed
@@ -159,49 +160,49 @@ class _MobileHomeLoaderState extends State<MobileHomeLoader> {
   // carousel is inserted, and the rest of the regular videos continue
   // below it as normal cards — exactly like the YouTube home feed layout.
   Widget _buildFeedList() {
-    // 🚀 ADDED: friendly empty-state when a search query matches nothing.
     if (_videos.isEmpty && _reels.isEmpty) {
       return Center(
         child: Text(
           _isSearching || _searchController.text.isNotEmpty
               ? 'No results for "${_searchController.text}"'
-              : 'No videos available yet.',
+              : 'No videos from an online node.',
           style: const TextStyle(color: Colors.white54),
         ),
       );
     }
 
-    const int carouselInsertAfter = 2;
-    final bool hasCarousel = _reels.isNotEmpty;
-    // Total rows = video cards + (1 carousel row, if any reels)
-    final int itemCount = _videos.length + (hasCarousel ? 1 : 0);
+    final liked = [..._videos.where((v) => v.likeCount > 0)]..sort((a, b) => b.likeCount.compareTo(a.likeCount));
+    final popular = [..._videos]..sort((a, b) => b.viewCount.compareTo(a.viewCount));
+    final music = _videos.where((v) => v.category.toLowerCase() == 'music' || v.tags.any((t) => t.toLowerCase() == 'music')).toList();
+    final comedy = _videos.where((v) {
+      final c = v.category.toLowerCase();
+      return c == 'comedy' || c == 'entertainment' || v.tags.any((t) => ['comedy', 'funny'].contains(t.toLowerCase()));
+    }).toList();
 
-    return ListView.separated(
-      padding: const EdgeInsets.only(top: 8, bottom: 80),
-      itemCount: itemCount,
-      separatorBuilder: (context, index) => const Divider(
-        color: Colors.white12,
-        thickness: 1,
-        height: 1,
-      ),
-      itemBuilder: (context, index) {
-        // Insert the Shots carousel right after the first `carouselInsertAfter`
-        // regular videos (or at the end if fewer videos exist than that).
-        final int carouselPosition = hasCarousel
-            ? (carouselInsertAfter <= _videos.length ? carouselInsertAfter : _videos.length)
-            : -1;
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 80),
+      children: [
+        _mobileSection('Recommended', _videos.take(6).toList()),
+        if (_reels.isNotEmpty) _buildShotsCarousel(),
+        _mobileSection('Liked', liked.take(6).toList()),
+        _mobileSection('Popular', popular.take(6).toList()),
+        _mobileSection('Music', music),
+        _mobileSection('Comedy', comedy),
+      ],
+    );
+  }
 
-        if (hasCarousel && index == carouselPosition) {
-          return _buildShotsCarousel();
-        }
-
-        // Shift the video index down by one once we're past the carousel row.
-        final videoIndex = (hasCarousel && index > carouselPosition) ? index - 1 : index;
-        return LoaderVideoCard(
-          video: _videos[videoIndex],
-          gatewayUrl: widget.gatewayUrl,
-        );
-      },
+  Widget _mobileSection(String title, List<PlayerVideo> videos) {
+    if (videos.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+          child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+        ),
+        ...videos.map((v) => LoaderVideoCard(video: v, gatewayUrl: widget.gatewayUrl)),
+      ],
     );
   }
 
@@ -265,28 +266,7 @@ class _ShotsCarouselItem extends StatelessWidget {
   const _ShotsCarouselItem({required this.video, required this.onTap});
 
   String _cleanThumbnailUrl(String raw) {
-    String cleanUrl = raw.trim();
-    if (cleanUrl.contains('192.168.1.15')) {
-      cleanUrl = cleanUrl.replaceAll('192.168.1.15', '192.168.1.186');
-    }
-    if (cleanUrl.isEmpty) return cleanUrl;
-    if (cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1') || cleanUrl.contains('localhost')) {
-      cleanUrl = cleanUrl.replaceAll('https://', 'http://');
-      if (!cleanUrl.startsWith('http://')) {
-        cleanUrl = 'http://$cleanUrl';
-      }
-    } else {
-      if (!cleanUrl.startsWith('http')) {
-        cleanUrl = 'https://$cleanUrl';
-      }
-    }
-    if (cleanUrl.endsWith('/')) {
-      cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
-    }
-    if ((cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1')) && !cleanUrl.contains(':55000')) {
-      cleanUrl = '$cleanUrl:55000';
-    }
-    return cleanUrl;
+    return NodeUrl.sanitize(raw);
   }
 
   @override
@@ -349,21 +329,41 @@ class LoaderVideoCard extends StatefulWidget {
 
 class _LoaderVideoCardState extends State<LoaderVideoCard> {
   late int _liveViews;
+  late int _liveLikes;
+  bool _liked = false;
   late final MobileBridgeService _bridge;
 
   @override
   void initState() {
     super.initState();
     _liveViews = widget.video.viewCount;
+    _liveLikes = widget.video.likeCount;
     _bridge = MobileBridgeService(gatewayUrl: widget.video.creatorUrl);
     _fetchLiveNodeViews();
   }
 
+  Future<void> _toggleLike() async {
+    if (_liked) return;
+    setState(() {
+      _liked = true;
+      _liveLikes += 1;
+    });
+    HapticFeedback.lightImpact();
+    final ok = await _bridge.postReaction(widget.video.videoId, widget.video.creatorUid, 'heart');
+    if (!ok && mounted) {
+      setState(() {
+        _liked = false;
+        _liveLikes = (_liveLikes - 1).clamp(0, 1 << 30);
+      });
+    }
+  }
+
   Future<void> _fetchLiveNodeViews() async {
     final stats = await _bridge.fetchVideoStats(widget.video.videoId);
-    if (stats != null && stats['views'] != null && mounted) {
+    if (stats != null && mounted) {
       setState(() {
-        _liveViews = stats['views'];
+        if (stats['views'] != null) _liveViews = stats['views'];
+        if (stats['likes'] != null) _liveLikes = stats['likes'];
       });
     }
   }
@@ -453,58 +453,7 @@ class _LoaderVideoCardState extends State<LoaderVideoCard> {
 
     @override
   Widget build(BuildContext context) {
-    // 🚀 Robust URL normalization for local & cloud nodes
-    String cleanUrl = widget.video.creatorUrl.trim();
-
-    // 🚀 THE FIX: only assume "this is my own local gateway" when the video
-    // actually belongs to the currently logged-in user. Applying this fallback
-    // to OTHER creators' videos was silently redirecting their thumbnail
-    // requests to OUR OWN gateway (which doesn't have their file -> 404),
-    // even though their video streamed fine because the player widget builds
-    // its URL separately and doesn't have this bug.
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    final isOwnVideo = currentUserId != null && widget.video.creatorUid == currentUserId;
-
-    // Auto-swap old IP to current active PC IP
-    if (cleanUrl.contains('192.168.1.15')) {
-      cleanUrl = cleanUrl.replaceAll('192.168.1.15', '192.168.1.186');
-    }
-
-    // 🚀 THE REAL FIX: 'myqrmart.com' is our OWN app's real cloud tunnel domain
-    // (e.g. "xyz.myqrmart.com" is a legitimate, working address for any creator),
-    // NOT a placeholder meaning "unset". Treating it as unset was wrongly
-    // redirecting other creators' real, working thumbnail URLs to our own PC.
-    // We now only substitute our own gateway when the URL is genuinely EMPTY,
-    // and only for our own videos. Everyone else's non-empty URL (including
-    // myqrmart.com ones) just gets normal scheme normalization, same as the
-    // bridge service already does successfully for /stats calls.
-    if (cleanUrl.isEmpty) {
-      if (isOwnVideo) {
-        cleanUrl = 'http://192.168.1.186:55000';
-      }
-      // else: leave empty; errorBuilder will show the placeholder icon
-    } else {
-      // Force http for local network addresses
-      if (cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1') || cleanUrl.contains('localhost')) {
-        cleanUrl = cleanUrl.replaceAll('https://', 'http://');
-        if (!cleanUrl.startsWith('http://')) {
-          cleanUrl = 'http://$cleanUrl';
-        }
-      } else {
-        if (!cleanUrl.startsWith('http')) {
-          cleanUrl = 'https://$cleanUrl';
-        }
-      }
-
-      if (cleanUrl.endsWith('/')) {
-        cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
-      }
-
-      // Enforce port 55000 for local network IPs if missing
-      if ((cleanUrl.contains('192.168.') || cleanUrl.contains('10.0.') || cleanUrl.contains('127.0.0.1')) && !cleanUrl.contains(':55000')) {
-        cleanUrl = '$cleanUrl:55000';
-      }
-    }
+    final cleanUrl = NodeUrl.sanitize(widget.video.creatorUrl);
 
     final thumbnailUrl = '$cleanUrl/player/video/thumbnail/${widget.video.videoId}';
     
@@ -609,7 +558,17 @@ class _LoaderVideoCardState extends State<LoaderVideoCard> {
                     ],
                   ),
                 ),
-                const Icon(Icons.more_vert, color: Colors.white),
+                GestureDetector(
+                  onTap: _toggleLike,
+                  child: Column(
+                    children: [
+                      Icon(_liked ? Icons.favorite : Icons.favorite_border,
+                          color: _liked ? Colors.pinkAccent : Colors.white, size: 22),
+                      const SizedBox(height: 2),
+                      Text(_formatViews(_liveLikes), style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

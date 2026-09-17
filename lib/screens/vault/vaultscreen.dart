@@ -96,10 +96,6 @@ class _VaultScreenState extends State<VaultScreen> {
         return <String>{};
       }
 
-      if (!dynamicUrl.startsWith('http')) {
-        dynamicUrl = 'https://$dynamicUrl';
-      }
-
       final Uri uri = Uri.parse('$dynamicUrl/vault/get_synced_ids');
       debugPrint("Asking Desktop at: $uri");
 
@@ -435,7 +431,6 @@ class _VaultScreenState extends State<VaultScreen> {
       if (dynamicUrl == null || dynamicUrl.isEmpty) {
         throw Exception("No Desktop Found.");
       }
-      if (!dynamicUrl.startsWith('http')) dynamicUrl = 'https://$dynamicUrl';
 
       if (!await syncService.isGatewayOnline(dynamicUrl)) {
         throw Exception("Desktop Offline.");

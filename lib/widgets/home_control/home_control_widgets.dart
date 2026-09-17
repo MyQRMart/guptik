@@ -62,7 +62,7 @@ class AnimatedSwitchIcon extends StatelessWidget {
         icon = Icons.lightbulb;
         break;
       case SwitchType.fan:
-        icon = FontAwesomeIcons.fan;
+        icon = FontAwesomeIcons.fan.data;
         color = isOn ? Colors.blue : Colors.grey;
         break;
       case SwitchType.ac:

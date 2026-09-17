@@ -36,6 +36,9 @@ import 'package:guptik/services/dashboard/conversations_service.dart';
 import 'package:guptik/screens/dashboard/business_settings_screen.dart';
 import 'package:guptik/screens/whatsapp/main_whatsapp_screen.dart';
 import 'package:guptik/screens/mediaplayer/mobile_main_layout.dart';
+import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/node/node_link_service.dart';
+import 'package:guptik/widgets/home/node_connection_banner.dart';
 // import 'package:guptik/widgets/home/water_key_button.dart';
 
 // IMPORTANT IMPORTS FOR YOUR NEWLY SEPARATED FILES
@@ -1216,31 +1219,30 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                             const SizedBox(height: 20),
+                            const NodeConnectionBanner(),
+                            const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Flexible(
                                   fit: FlexFit.tight,
                                   child: WaterSplashButton(
-                                    // 1. Fetch the URL dynamically
              onTap: () async {
-              // 🚀 Optional: Show a loading indicator in your UI
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Locating your node...")));
             final user = Supabase.instance.client.auth.currentUser;
            if (user == null) return;
 
-         // Query your "Phonebook" in Supabase
-            final response = await Supabase.instance.client
-         .from('mp_channels')
-         .select('tunnel_url')
-         .eq('owner_uid', user.id)
-         .single();
-
-  final String dynamicUrl = response['tunnel_url'] ?? 'https://guptik.myqrmart.com';
+            final dynamicUrl = await NodeLinkService.instance.connectBest();
 
   if (!context.mounted) return;
+
+  if (dynamicUrl == null || dynamicUrl.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No desktop on this account. Open GupTik Desktop with the same email.')),
+    );
+    return;
+  }
   
-  // 2. Navigate with the actual, live URL
   Navigator.push(context, MaterialPageRoute(builder: (context) => MobileMainLayout(
     gatewayUrl: dynamicUrl, 
     currentUserUid: user.id,

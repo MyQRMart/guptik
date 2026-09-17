@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:guptik/models/facebook/meta_comment_model.dart';
 import 'package:guptik/models/facebook/meta_content_model.dart';
 import 'package:guptik/services/facebook/meta_service.dart';
+import 'package:guptik/services/node/social_reply_service.dart';
 import 'package:guptik/config/app_theme.dart';
 
 class CommentsScreen extends StatefulWidget {
@@ -71,42 +72,53 @@ class _CommentsScreenState extends State<CommentsScreen> {
     }
   }
 
+  Future<void> _draftLocal() async {
+    final inbound = _comments.isEmpty
+        ? widget.postCaption
+        : _comments.first.text;
+    try {
+      final draft = await SocialReplyService().draft(
+        platform: widget.platform == SocialPlatform.instagram ? 'instagram' : 'facebook',
+        kind: 'comment',
+        text: inbound.isEmpty ? widget.postCaption : inbound,
+      );
+      if (!mounted) return;
+      if (draft == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Turn on this PC’s AI model (Auto-reply / node).')),
+        );
+        return;
+      }
+      _commentController.text = draft;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
   Future<void> _postComment() async {
     if (_commentController.text.isEmpty) return;
 
     final commentText = _commentController.text;
-    _commentController.clear();
-
     setState(() => _isPosting = true);
 
     try {
-      // Add comment locally for now
-      final newComment = MetaComment(
-        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
-        authorName: 'You',
-        authorId: 'me',
-        text: commentText,
-        createdTime: DateTime.now().toIso8601String(),
+      final success = await _metaService.postComment(
+        widget.postId,
+        commentText,
         platform: widget.platform,
-        isFromPageOwner: true,
-        replies: [],
       );
-
-      setState(() {
-        _comments.insert(0, newComment);
-      });
-
-      // TODO: Call actual API to post comment
-      debugPrint("Comment posted: $commentText");
+      if (!success) throw Exception('Graph postComment failed');
+      _commentController.clear();
+      await _loadComments();
     } catch (e) {
       debugPrint("Error posting comment: $e");
       if (mounted) {
+        _commentController.text = commentText;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Failed to post comment')));
-        setState(() {
-          _comments.removeAt(0);
-        });
       }
     } finally {
       if (mounted) {
@@ -723,6 +735,11 @@ class _CommentsScreenState extends State<CommentsScreen> {
                     style: AppTheme.textTheme.bodyMedium,
                     maxLines: null,
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome),
+                  tooltip: 'Draft with this PC’s model',
+                  onPressed: _draftLocal,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Container(
