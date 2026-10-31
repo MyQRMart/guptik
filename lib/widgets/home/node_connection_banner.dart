@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:guptik/screens/mediaplayer/mobile_main_layout.dart';
 import 'package:guptik/services/node/node_link_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/screens/node/pair_node_screen.dart';
+import 'package:guptik/services/node/node_auth.dart';
 
 const Color _gold = Color(0xFFD4AF37);
 
@@ -38,7 +40,8 @@ class _NodeConnectionBannerState extends State<NodeConnectionBanner> {
     final user = Supabase.instance.client.auth.currentUser;
     final url = _activeUrl ?? await NodeLinkService.instance.connectBest();
     if (!mounted) return;
-    if (url == null || url.isEmpty) {
+    final viewerOnly = !NodeAuth.instance.isPaired;
+    if ((url == null || url.isEmpty) && !viewerOnly) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No desktop on this account yet. Open GupTik on the PC with the same email.')),
       );
@@ -47,7 +50,7 @@ class _NodeConnectionBannerState extends State<NodeConnectionBanner> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MobileMainLayout(gatewayUrl: url, currentUserUid: user?.id ?? ''),
+        builder: (_) => MobileMainLayout(gatewayUrl: url ?? '', currentUserUid: user?.id ?? ''),
       ),
     );
   }
@@ -78,9 +81,21 @@ class _NodeConnectionBannerState extends State<NodeConnectionBanner> {
           ok ? _activeUrl! : 'Same email on PC + phone is enough. No QR required.',
           style: const TextStyle(color: Colors.white54, fontSize: 11),
         ),
-        trailing: TextButton(
-          onPressed: ok ? _openPlayer : _refresh,
-          child: Text(ok ? 'Open' : 'Connect', style: const TextStyle(color: _gold)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const PairNodeScreen()));
+                if (mounted) setState(() {});
+              },
+              child: Text(NodeAuth.instance.isPaired ? 'Paired' : 'Pair', style: const TextStyle(color: _gold)),
+            ),
+            TextButton(
+              onPressed: (ok || !NodeAuth.instance.isPaired) ? _openPlayer : _refresh,
+              child: Text(ok ? 'Open' : (NodeAuth.instance.isPaired ? 'Connect' : 'Watch'), style: const TextStyle(color: _gold)),
+            ),
+          ],
         ),
         onTap: _refresh,
       ),

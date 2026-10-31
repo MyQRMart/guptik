@@ -44,6 +44,7 @@ import 'package:guptik/widgets/home/node_connection_banner.dart';
 // IMPORTANT IMPORTS FOR YOUR NEWLY SEPARATED FILES
 import 'analytics_and_account_tab.dart'; 
 import 'profile_menu_dialog.dart';
+import 'package:guptik/services/node/node_auth.dart';
 
 // Ancient Gold Color Definition
 const Color _ancientGold = Color(0xFFD4AF37);
@@ -1236,7 +1237,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   if (!context.mounted) return;
 
-  if (dynamicUrl == null || dynamicUrl.isEmpty) {
+  final viewerOnly = !NodeAuth.instance.isPaired;
+  if ((dynamicUrl == null || dynamicUrl.isEmpty) && !viewerOnly) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('No desktop on this account. Open GupTik Desktop with the same email.')),
     );
@@ -1244,7 +1246,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   Navigator.push(context, MaterialPageRoute(builder: (context) => MobileMainLayout(
-    gatewayUrl: dynamicUrl, 
+    gatewayUrl: dynamicUrl ?? '', 
     currentUserUid: user.id,
   )));
    },
