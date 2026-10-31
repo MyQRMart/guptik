@@ -6,6 +6,7 @@ import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/widgets/mediaplayer/mobile_video_player_widget.dart';
 import 'package:guptik/screens/mediaplayer/mobile_profile_screen.dart'; // 🚀 Added import for profile routing
 import 'package:guptik/screens/mediaplayer/mobile_reels_screen.dart'; // 🚀 ADDED: YouTube-style Shorts carousel opens the full reels feed
+import 'package:guptik/widgets/node_image.dart';
 
 class MobileHomeLoader extends StatefulWidget {
   final String gatewayUrl;
@@ -287,7 +288,7 @@ class _ShotsCarouselItem extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(
+            NodeImage(
               thumbnailUrl,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => const Center(
@@ -479,7 +480,7 @@ class _LoaderVideoCardState extends State<LoaderVideoCard> {
             aspectRatio: 16 / 9,
             child: Container(
               color: const Color(0xFF1E1E1E),
-              child: Image.network(
+              child: NodeImage(
                 thumbnailUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => const Center(

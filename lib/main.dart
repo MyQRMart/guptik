@@ -15,10 +15,13 @@ import 'package:guptik/utils/theme/theme_manager.dart';
 import 'package:guptik/widgets/auth_wrapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:guptik/config/app_config.dart';
+import 'package:guptik/services/node/node_auth.dart';
+import 'package:guptik/screens/node/pair_node_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeManager.instance.init();
+  await NodeAuth.instance.load();
 
   debugPrint('==== APP START ====');
 
@@ -105,6 +108,10 @@ class _MyAppState extends State<MyApp> {
         // Handle mobile deep links
         await _deepLinkService.initialize(
           onLinkReceived: (Uri uri) {
+            if (uri.scheme == 'guptik' && uri.host == 'pair') {
+              handlePairLink(uri.toString());
+              return;
+            }
             _deepLinkService.handleDeepLink(uri);
           },
         );

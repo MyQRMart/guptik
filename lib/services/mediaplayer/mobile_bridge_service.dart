@@ -7,6 +7,7 @@ import 'package:guptik/services/mediaplayer/live_node_feed.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class MobileBridgeService {
   final String gatewayUrl; 
@@ -71,7 +72,7 @@ class MobileBridgeService {
   Future<List<PlayerVideo>> fetchChannelVideos(String nodeUrl, String channelId) async {
     try {
       final safeUrl = nodeUrl.startsWith('http') ? nodeUrl : 'https://$nodeUrl';
-      final response = await http.get(Uri.parse('$safeUrl/channel/videos/$channelId'));
+      final response = await nodeHttp.get(Uri.parse('$safeUrl/channel/videos/$channelId'));
       
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
@@ -86,7 +87,7 @@ class MobileBridgeService {
 
   Future<bool> postReaction(String videoId, String creatorUid, String reactionType) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/like'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -110,7 +111,7 @@ class MobileBridgeService {
 
   Future<void> addVideoView(String videoId, String viewerUid) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/view'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'video_id': videoId, 'viewer_uid': viewerUid}),
@@ -139,7 +140,7 @@ class MobileBridgeService {
 
   Future<Map<String, dynamic>?> fetchVideoStats(String videoId) async {
     try {
-      final response = await http.get(Uri.parse('$_cleanGateway/player/video/stats/$videoId'));
+      final response = await nodeHttp.get(Uri.parse('$_cleanGateway/player/video/stats/$videoId'));
       if (response.statusCode == 200) return jsonDecode(response.body);
     } catch (e) {
       debugPrint('Stats Fetch Error: $e');
@@ -155,7 +156,7 @@ class MobileBridgeService {
     String? viewerName,
   }) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/comment'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -178,7 +179,7 @@ class MobileBridgeService {
   // sends the viewer's uid so the gateway can include their own reaction.
   Future<List<PlayerComment>> fetchComments(String videoId, {String? viewerUid}) async {
     try {
-      final response = await http.get(
+      final response = await nodeHttp.get(
         Uri.parse('$_cleanGateway/player/video/comments/$videoId'),
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +204,7 @@ class MobileBridgeService {
   // 🚀 ADDED: fetches replies for a specific parent comment.
   Future<List<PlayerComment>> fetchReplies(String videoId, String parentCommentId, {String? viewerUid}) async {
     try {
-      final response = await http.get(
+      final response = await nodeHttp.get(
         Uri.parse('$_cleanGateway/player/video/comments/$videoId/replies/$parentCommentId'),
         headers: {
           'Content-Type': 'application/json',
@@ -228,7 +229,7 @@ class MobileBridgeService {
   // 🚀 ADDED: edits an existing comment (only succeeds if editorUid owns it).
   Future<bool> editComment(String commentId, String newText, String editorUid) async {
     try {
-      final response = await http.put(
+      final response = await nodeHttp.put(
         Uri.parse('$_cleanGateway/player/video/comment/$commentId'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'comment_text': newText, 'editor_uid': editorUid}),
@@ -243,7 +244,7 @@ class MobileBridgeService {
   // 🚀 ADDED: soft-deletes a comment (only succeeds if deleterUid owns it).
   Future<bool> deleteComment(String commentId, String deleterUid) async {
     try {
-      final response = await http.delete(
+      final response = await nodeHttp.delete(
         Uri.parse('$_cleanGateway/player/video/comment/$commentId'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'deleter_uid': deleterUid}),
@@ -263,7 +264,7 @@ class MobileBridgeService {
     required String reactionType,
   }) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/comment/$commentId/react'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'reactor_uid': reactorUid, 'reaction_type': reactionType}),
@@ -288,7 +289,7 @@ class MobileBridgeService {
     required String reason,
   }) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/comment/$commentId/report'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'reporter_uid': reporterUid, 'reason': reason}),
@@ -302,7 +303,7 @@ class MobileBridgeService {
 
   Future<bool> saveVideo(String videoId, String creatorUid) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/save'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -328,7 +329,7 @@ class MobileBridgeService {
     String? reposterChannelName,
   }) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/repost'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -359,7 +360,7 @@ class MobileBridgeService {
     String shareMethod = 'link',
   }) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/share'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -382,7 +383,7 @@ class MobileBridgeService {
     required bool? interested,
   }) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/interest'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -401,7 +402,7 @@ class MobileBridgeService {
 
   Future<List<dynamic>> fetchStickers(String videoId) async {
     try {
-      final response = await http.get(Uri.parse('$_cleanGateway/player/video/stickers/$videoId'));
+      final response = await nodeHttp.get(Uri.parse('$_cleanGateway/player/video/stickers/$videoId'));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
@@ -449,7 +450,7 @@ class MobileBridgeService {
 
       request.bodyBytes = imageFile != null ? await imageFile.readAsBytes() : <int>[];
 
-      final streamedResponse = await request.send();
+      final streamedResponse = await nodeHttp.send(request);
       return streamedResponse.statusCode == 200;
     } catch (e) {
       debugPrint('Add Sticker Error: $e');
@@ -459,7 +460,7 @@ class MobileBridgeService {
 
  Future<Map<String, dynamic>?> fetchChannelProfile(String channelId) async {
     try {
-      final response = await http.get(Uri.parse('$_cleanGateway/channel/profile/$channelId'));
+      final response = await nodeHttp.get(Uri.parse('$_cleanGateway/channel/profile/$channelId'));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
@@ -480,7 +481,7 @@ class MobileBridgeService {
   }) async {
     if (_cleanGateway.isEmpty) return false;
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/player/video/history'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -508,7 +509,7 @@ class MobileBridgeService {
   Future<List<PlayerVideo>> _fetchNodeVideoList(String path) async {
     if (_cleanGateway.isEmpty) return [];
     try {
-      final response = await http.get(Uri.parse('$_cleanGateway$path'));
+      final response = await nodeHttp.get(Uri.parse('$_cleanGateway$path'));
       if (response.statusCode != 200) return [];
       final List data = jsonDecode(response.body) as List;
       final parsed = data
@@ -559,7 +560,7 @@ class MobileBridgeService {
   }) async {
     if (_cleanGateway.isEmpty) return false;
     try {
-      final response = await http.get(
+      final response = await nodeHttp.get(
         Uri.parse('$_cleanGateway/channel/subscribe/status/$channelId/$subscriberUid'),
       );
       if (response.statusCode == 200) {
@@ -577,7 +578,7 @@ class MobileBridgeService {
   }) async {
     if (_cleanGateway.isEmpty) return null;
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_cleanGateway/channel/subscribe/toggle'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -597,7 +598,7 @@ class MobileBridgeService {
   Future<List<Map<String, dynamic>>> fetchPlaylists(String channelId) async {
     if (_cleanGateway.isEmpty) return [];
     try {
-      final response = await http.get(
+      final response = await nodeHttp.get(
         Uri.parse('$_cleanGateway/player/playlists?channel_id=$channelId'),
       );
       if (response.statusCode != 200) return [];
@@ -613,7 +614,7 @@ class MobileBridgeService {
   Future<List<Map<String, dynamic>>> fetchDrafts(String channelId) async {
     if (_cleanGateway.isEmpty) return [];
     try {
-      final response = await http.get(
+      final response = await nodeHttp.get(
         Uri.parse('$_cleanGateway/player/drafts?channel_id=$channelId'),
       );
       if (response.statusCode != 200) return [];

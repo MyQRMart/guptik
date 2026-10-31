@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:guptik/models/contacts/phone_contact.dart';
 import 'package:guptik/services/contacts/device_contacts_service.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class ContactSyncService {
   Future<int> pushToNode(List<PhoneContact> contacts) async {
@@ -17,7 +17,7 @@ class ContactSyncService {
     final groups = await DeviceContactsService().loadGroups();
     for (var i = 0; i < contacts.length; i += chunk) {
       final slice = contacts.skip(i).take(chunk).map((c) => c.toJson()).toList();
-      final res = await http.post(
+      final res = await nodeHttp.post(
         Uri.parse('$base/contacts/sync'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -34,7 +34,7 @@ class ContactSyncService {
       sent += slice.length;
     }
     if (contacts.isEmpty) {
-      final res = await http.post(
+      final res = await nodeHttp.post(
         Uri.parse('$base/contacts/sync'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'contacts': [], 'replace': true, 'offset': 0}),

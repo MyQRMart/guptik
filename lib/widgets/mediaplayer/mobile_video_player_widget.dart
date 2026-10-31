@@ -8,6 +8,8 @@ import 'package:video_player/video_player.dart';
 import 'mobile_reaction_bar.dart';
 import 'mobile_sticker_overlay.dart'; // 🚀 ADDED: shoppable stickers overlay
 import 'mobile_comment_widget.dart'; // 🚀 ADDED: full comment UI with reactions/replies/edit/delete
+import 'package:guptik/widgets/node_image.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class MobileVideoPlayerWidget extends StatefulWidget {
   final PlayerVideo video;
@@ -121,7 +123,8 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget> {
     
     debugPrint("📱 Mobile attempting to stream channel: $fullStreamUrl");
 
-    _controller = VideoPlayerController.networkUrl(Uri.parse(fullStreamUrl));    
+    _controller = VideoPlayerController.networkUrl(Uri.parse(fullStreamUrl),
+        httpHeaders: await NodeHttp.prepareHeaders(fullStreamUrl));    
     try {
       await _controller!.initialize();
       if (mounted) {
@@ -548,7 +551,7 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget> {
                       aspectRatio: 16 / 9,
                       child: Container(
                         color: Colors.grey[800],
-                        child: Image.network(
+                        child: NodeImage(
                           itemThumbUrl,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => const Icon(Icons.play_circle_fill, color: Colors.orange),

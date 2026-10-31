@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class NodeTableClient {
   Future<String> _base() async {
@@ -26,7 +26,7 @@ class NodeTableClient {
       if (notNull != null) 'not_null': notNull,
     };
     final uri = Uri.parse('${await _base()}/store/$table').replace(queryParameters: qp.isEmpty ? null : qp);
-    final res = await http.get(uri).timeout(const Duration(seconds: 20));
+    final res = await nodeHttp.get(uri).timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) {
       debugPrint('store GET $table ${res.statusCode} ${res.body}');
       throw StateError('Node store GET failed (${res.statusCode}).');
@@ -42,7 +42,7 @@ class NodeTableClient {
   }
 
   Future<Map<String, dynamic>> insert(String table, Map<String, dynamic> row) async {
-    final res = await http
+    final res = await nodeHttp
         .post(
           Uri.parse('${await _base()}/store/$table'),
           headers: {'Content-Type': 'application/json'},
@@ -61,7 +61,7 @@ class NodeTableClient {
     required Map<String, String> eq,
     required Map<String, dynamic> set,
   }) async {
-    final res = await http
+    final res = await nodeHttp
         .patch(
           Uri.parse('${await _base()}/store/$table'),
           headers: {'Content-Type': 'application/json'},
@@ -78,7 +78,7 @@ class NodeTableClient {
     final uri = Uri.parse('${await _base()}/store/$table').replace(
       queryParameters: {for (final e in eq.entries) 'eq_${e.key}': e.value},
     );
-    final res = await http.delete(uri).timeout(const Duration(seconds: 20));
+    final res = await nodeHttp.delete(uri).timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) {
       debugPrint('store DELETE $table ${res.statusCode} ${res.body}');
       throw StateError('Node store delete failed (${res.statusCode}).');

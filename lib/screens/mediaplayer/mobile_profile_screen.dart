@@ -5,6 +5,7 @@ import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/widgets/mediaplayer/mobile_video_player_widget.dart';
 import 'package:guptik/screens/mediaplayer/mobile_library_screen.dart';
+import 'package:guptik/widgets/node_image.dart';
 
 class MobileProfileScreen extends StatefulWidget {
   final String channelId;
@@ -351,7 +352,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
+                                child: NodeImage(
                                   itemThumbUrl,
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.play_arrow, color: Colors.white70)),

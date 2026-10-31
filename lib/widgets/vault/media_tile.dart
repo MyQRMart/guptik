@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:guptik/models/vault/vault_media.dart';
+import 'package:guptik/widgets/node_image.dart';
 
 
 class MediaTile extends StatelessWidget {
@@ -23,7 +24,7 @@ class MediaTile extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           // 1. The Image/Thumbnail
-          Image.network(
+          NodeImage(
             media.url,
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {

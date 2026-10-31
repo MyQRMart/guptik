@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class MobileUploadService {
   final String gatewayUrl;
@@ -76,7 +77,7 @@ class MobileUploadService {
 
       request.bodyBytes = await videoFile.readAsBytes();
       
-      final streamedResponse = await request.send();
+      final streamedResponse = await nodeHttp.send(request);
       return streamedResponse.statusCode == 200;
     } catch (e) {
       debugPrint("❌ Mobile cross-sync upload failure: $e");

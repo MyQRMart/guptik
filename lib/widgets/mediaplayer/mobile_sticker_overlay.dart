@@ -3,6 +3,7 @@ import 'package:guptik/models/mediaplyer/video_stricker_model.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/mediaplayer/mobile_bridge_service.dart';
+import 'package:guptik/widgets/node_image.dart';
 
 /// MobileStickerOverlay — mobile counterpart to desktop's sticker_overlay.dart.
 /// Fetches shoppable stickers for a video via the gateway's read-only
@@ -108,7 +109,7 @@ class _MobileStickerOverlayState extends State<MobileStickerOverlay> {
                 if (sticker.imagePath != null && sticker.imagePath!.isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
+                    child: NodeImage(
                       sticker.imagePath!,
                       width: 70,
                       height: 70,

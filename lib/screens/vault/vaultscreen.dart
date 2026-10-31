@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:guptik/services/vault/sync_tracker.dart';
 import 'package:guptik/services/vault/vault_sync_service.dart';
@@ -13,6 +12,7 @@ import 'synced_files_screen.dart';
 
 // IMPORT THE SHARED BACKGROUND
 import 'package:guptik/utils/theme/dynamic_app_background.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 // Ancient Gold Theme Constants
 const Color _ancientGold = Color(0xFFD4AF37);
@@ -99,7 +99,7 @@ class _VaultScreenState extends State<VaultScreen> {
       final Uri uri = Uri.parse('$dynamicUrl/vault/get_synced_ids');
       debugPrint("Asking Desktop at: $uri");
 
-      final response = await http.get(uri);
+      final response = await nodeHttp.get(uri);
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
