@@ -7,7 +7,6 @@ import 'package:flutter/services.dart'; // 🚀 ADDED: Required for Clipboard (C
 import 'package:supabase_flutter/supabase_flutter.dart'; 
 import 'package:image_picker/image_picker.dart'; 
 import 'package:video_player/video_player.dart'; 
-import 'package:http/http.dart' as http; 
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart'; 
 import '../../services/trustme/trust_me_service.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart'; 
