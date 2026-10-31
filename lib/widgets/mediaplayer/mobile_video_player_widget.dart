@@ -3,6 +3,7 @@ import 'package:guptik/models/mediaplyer/player_video_model.dart';
 import 'package:guptik/models/mediaplyer/player_comment_model.dart';
 import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/mediaplayer/local_media_history_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'mobile_reaction_bar.dart';
@@ -128,6 +129,8 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget> {
         setState(() {});
         _controller!.play();
       }
+      // Phone-local history (works offline and without login).
+      LocalMediaHistoryService.instance.recordWatch(widget.video);
     } catch (playerException) {
       debugPrint("❌ VideoPlayer initialization crashed: $playerException");
       if (mounted) {
@@ -157,6 +160,9 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget> {
     _controller?.dispose();
     super.dispose();
     _logHistoryToMyNode(position, duration);
+    if (duration > 0) {
+      LocalMediaHistoryService.instance.updateProgress(widget.video.videoId, position, duration);
+    }
   }
 
   Future<void> _logHistoryToMyNode(int position, int duration) async {
