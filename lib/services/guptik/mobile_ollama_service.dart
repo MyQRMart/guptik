@@ -113,7 +113,9 @@ class MobileOllamaService {
     }
   }
 
-  /// 🚀 Stream chat response supporting multi-provider configuration
+  /// 🚀 Stream a chat reply through the node's agent route.
+  /// The node holds the provider key and calls the model; the phone never sees the key.
+  /// `provider`, `apiKey` and `endpointUrl` are kept for call-site compatibility and ignored.
   Stream<String> generateChatStream({
     required String provider,
     required String model,
@@ -121,96 +123,42 @@ class MobileOllamaService {
     String apiKey = '',
     String endpointUrl = '',
   }) async* {
-    // 1. Sanitize API Key (strip 'bearer', spaces, newlines)
-    String cleanKey = apiKey.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
-    if (cleanKey.toLowerCase().startsWith('bearer')) {
-      cleanKey = cleanKey.substring(6).trim();
-    }
-
-    if (cleanKey.isEmpty && provider != 'Ollama') {
-      yield "\n[Error]: $provider API Key is missing. Tap Settings (⚙️) to enter your API Key.";
-      return;
-    }
-
-    // 2. Resolve URL & force HTTPS for cloud endpoints
-    String url = endpointUrl.trim().isNotEmpty ? endpointUrl.trim() : _getDefaultEndpoint(provider);
-    if (url.startsWith("http://") && (url.contains("openrouter") || url.contains("openai") || url.contains("anthropic") || url.contains("deepseek"))) {
-      url = url.replaceFirst("http://", "https://");
-    }
-
-    final body = jsonEncode({
-      "model": model,
-      "messages": history,
-      "stream": true,
-    });
-
     try {
-      final request = http.Request('POST', Uri.parse(url));
-      request.body = body;
-
-      final Map<String, String> headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (provider == 'OpenRouter') {
-        headers['HTTP-Referer'] = 'https://guptik.com';
-        headers['X-Title'] = 'Guptik Mobile';
-      }
-
-      if (cleanKey.isNotEmpty) {
-        if (provider == 'Anthropic') {
-          headers['x-api-key'] = cleanKey;
-          headers['anthropic-version'] = '2023-06-01';
-        } else {
-          headers['Authorization'] = 'Bearer $cleanKey';
-        }
-      }
-
-      request.headers.addAll(headers);
+      final request = http.Request('POST', Uri.parse('$tunnelUrl/api/agent/chat'))
+        ..headers.addAll({'Content-Type': 'application/json', 'Accept': 'text/event-stream'})
+        ..body = jsonEncode({'model': model, 'messages': history});
 
       final streamedResponse = await nodeHttp.send(request);
-
+      if (streamedResponse.statusCode == 401 || streamedResponse.statusCode == 403) {
+        yield "\n[Error]: This phone isn't paired with your node yet. Pair it from the desktop app's Settings to use AI.";
+        return;
+      }
       if (streamedResponse.statusCode != 200) {
         final errorBody = await streamedResponse.stream.bytesToString();
-        yield "\n[API Error ${streamedResponse.statusCode}]: $errorBody";
+        yield "\n[Node Error ${streamedResponse.statusCode}]: $errorBody";
         return;
       }
 
-      final stream = streamedResponse.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
-
-      await for (var line in stream) {
+      final lines = streamedResponse.stream.transform(utf8.decoder).transform(const LineSplitter());
+      await for (final line in lines) {
+        final trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        final payload = trimmed.substring(5).trim();
+        if (payload == '[DONE]') break;
         try {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty || trimmed.startsWith(':')) continue; // Skip comments & keep-alive lines
-
-          String payload = trimmed;
-          if (payload.startsWith('data: ')) {
-            payload = payload.substring(6).trim();
-          } else {
-            continue; // Ignore non-SSE lines
-          }
-
-          if (payload == '[DONE]') break;
-
           final data = jsonDecode(payload);
-
-          if (data['choices'] != null && data['choices'].isNotEmpty) {
-            final delta = data['choices'][0]['delta'];
-            if (delta != null && delta['content'] != null) {
-              yield delta['content'];
-            }
-          } else if (data['message'] != null && data['message']['content'] != null) {
-            yield data['message']['content'];
+          if (data['delta'] != null) {
+            yield data['delta'].toString();
+          } else if (data['error'] != null) {
+            yield "\n[AI Error]: ${data['error']}";
           }
         } catch (_) {
           // Ignore bad chunk parses
         }
       }
     } catch (e) {
-      yield "\n[Error connecting to AI Provider: $e]";
+      yield "\n[Error connecting to your node: $e]";
     }
   }
+
 }
