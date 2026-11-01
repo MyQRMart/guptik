@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'node_auth.dart';
 
 /// HTTP client for GupTik node gateways.
@@ -7,11 +8,45 @@ import 'node_auth.dart';
 ///  * Other people's nodes: the paired token is NEVER sent. Read-only player GETs
 ///    (stream, thumbnail, stats, watch, channel profile/videos) use a short-lived anonymous
 ///    viewer token fetched from that node's POST /viewer/token (the "incognito" viewer).
+///  * Like / comment / subscribe calls and comment reads on other nodes carry the signed-in
+///    user's current Supabase access token (refreshed when close to expiry), so the node can
+///    verify who is acting. Nothing else gets it. Signed out: anonymous viewers just watch.
 class NodeHttp extends http.BaseClient {
   NodeHttp([http.Client? inner]) : _inner = inner ?? http.Client();
   final http.Client _inner;
 
-  static final _viewerRead = RegExp(r'^/(player/video/(stream|thumbnail|stickers|stats)|watch|channel/(profile|videos))/[^/]+$');
+  static final _viewerRead = RegExp(
+      r'^/(player/video/(stream|thumbnail|stickers|stats|comments)|watch|channel/(profile|videos))/[^/]+$|^/player/video/comments/[^/]+/replies/[^/]+$');
+  static final _socialWrite = RegExp(
+      r'^/(player/video/(like|comment|view)|player/video/comment/[^/]+(/react|/report)?|channel/subscribe/toggle)$');
+  static final _socialGet = RegExp(
+      r'^/(player/video/comments/[^/]+(/replies/[^/]+)?|channel/subscribe/status/[^/]+/[^/]+)$');
+
+  /// Routes where another node needs to know which signed-in user is acting.
+  static bool isSocial(String method, String path) =>
+      method == 'GET' ? _socialGet.hasMatch(path) : _socialWrite.hasMatch(path);
+
+  /// The current Supabase access token, refreshed if it expires within a minute. Null when signed out.
+  /// Overridable for tests.
+  static Future<String?> Function() accountToken = _supabaseAccessToken;
+
+  static Future<String?> _supabaseAccessToken() async {
+    try {
+      final auth = Supabase.instance.client.auth;
+      final session = auth.currentSession;
+      if (session == null) return null;
+      var token = session.accessToken;
+      final exp = session.expiresAt; // seconds since epoch
+      if (exp != null && exp * 1000 - DateTime.now().millisecondsSinceEpoch < 60000) {
+        try {
+          token = (await auth.refreshSession()).session?.accessToken ?? token;
+        } catch (_) {}
+      }
+      return token;
+    } catch (_) {
+      return null;
+    }
+  }
   static final Map<String, _Viewer> _viewer = {};
   static final Map<String, DateTime> _cooldown = {};
 
@@ -65,6 +100,14 @@ class NodeHttp extends http.BaseClient {
       if (auth.isOwnOrigin(o) && auth.token != null) {
         request.headers['Authorization'] = 'Bearer ${auth.token}';
         usedOwnToken = true;
+      } else if (isSocial(request.method, request.url.path)) {
+        final a = await accountToken();
+        if (a != null && a.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $a';
+        } else if (request.method == 'GET' && _viewerRead.hasMatch(request.url.path)) {
+          final t = await viewerToken(request.url.toString());
+          if (t != null) request.headers['Authorization'] = 'Bearer $t';
+        }
       } else if (request.method == 'GET' && _viewerRead.hasMatch(request.url.path)) {
         final t = await viewerToken(request.url.toString());
         if (t != null) request.headers['Authorization'] = 'Bearer $t';
