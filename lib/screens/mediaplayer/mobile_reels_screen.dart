@@ -7,6 +7,7 @@ import 'package:guptik/models/mediaplyer/player_comment_model.dart';
 import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/screens/mediaplayer/mobile_profile_screen.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 /// MobileReelsScreen — a YouTube-Shorts / TikTok style, full-screen vertical
 /// swipe feed that only ever shows `isReel == true` videos.
@@ -217,7 +218,8 @@ class _ReelPlayerPageState extends State<_ReelPlayerPage> {
     final cleanGateway = _sanitizeGateway(widget.video.creatorUrl);
     final streamUrl = '$cleanGateway/player/video/stream/${widget.video.videoId}';
 
-    _controller = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+    _controller = VideoPlayerController.networkUrl(Uri.parse(streamUrl),
+        httpHeaders: await NodeHttp.prepareHeaders(streamUrl));
     try {
       await _controller!.initialize();
       await _controller!.setLooping(true);

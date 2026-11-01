@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:guptik/services/node/node_http.dart';
 
 class MobileOllamaService {
   final String tunnelUrl;
@@ -9,7 +10,7 @@ class MobileOllamaService {
   /// 🚀 Fetch active AI settings synced from desktop
   Future<Map<String, dynamic>> fetchDesktopAiConfig() async {
     try {
-      final response = await http.get(Uri.parse('$tunnelUrl/api/ai-config'));
+      final response = await nodeHttp.get(Uri.parse('$tunnelUrl/api/ai-config'));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
@@ -27,7 +28,7 @@ class MobileOllamaService {
     required String endpointUrl,
   }) async {
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$tunnelUrl/api/ai-config'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -70,7 +71,7 @@ class MobileOllamaService {
 
     if (provider == 'OpenRouter') {
       try {
-        final response = await http.get(
+        final response = await nodeHttp.get(
           Uri.parse('https://openrouter.ai/api/v1/models'),
         ).timeout(const Duration(seconds: 5));
 
@@ -168,7 +169,7 @@ class MobileOllamaService {
 
       request.headers.addAll(headers);
 
-      final streamedResponse = await request.send();
+      final streamedResponse = await nodeHttp.send(request);
 
       if (streamedResponse.statusCode != 200) {
         final errorBody = await streamedResponse.stream.bytesToString();

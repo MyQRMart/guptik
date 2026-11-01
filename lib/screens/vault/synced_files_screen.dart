@@ -9,8 +9,9 @@ import 'package:guptik/utils/theme/dynamic_app_background.dart';
 import 'package:guptik/widgets/mediaplayer/mobile_video_player_widget.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/services/node/node_http.dart';
+import 'package:guptik/widgets/node_image.dart';
 
 const Color _ancientGold = Color(0xFFD4AF37);
 const Color _darkBg = Color(0xFF0A0A0A);
@@ -181,7 +182,7 @@ class _SyncedFilesScreenState extends State<SyncedFilesScreen> {
         'expires_at': expiryDate?.toUtc().toIso8601String(),
       };
 
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$base/vault/share'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(shareData),
@@ -225,7 +226,7 @@ class _SyncedFilesScreenState extends State<SyncedFilesScreen> {
     try {
       final String? baseUrl = await _syncService.getDesktopUrl();
       if (baseUrl != null) {
-        final response = await http.get(Uri.parse('$baseUrl/vault/list'));
+        final response = await nodeHttp.get(Uri.parse('$baseUrl/vault/list'));
         if (response.statusCode == 200) {
           final List<dynamic> serverFiles = jsonDecode(response.body);
           serverFileNames = serverFiles.map((f) => f['name'].toString()).toList();
@@ -516,7 +517,7 @@ class _MobileSystemFolderScreenState extends State<MobileSystemFolderScreen> {
 
     try {
       final endpoint = '${widget.desktopUrl}/vault/system-folder/${widget.folderType}';
-      final response = await http.get(Uri.parse(endpoint)).timeout(const Duration(seconds: 8));
+      final response = await nodeHttp.get(Uri.parse(endpoint)).timeout(const Duration(seconds: 8));
       
       if (response.statusCode == 200 && mounted) {
         final List<dynamic> decodedData = jsonDecode(response.body);
@@ -712,7 +713,7 @@ class _MobileSystemFolderScreenState extends State<MobileSystemFolderScreen> {
                                     appBar: AppBar(backgroundColor: Colors.black, title: Text(name, style: const TextStyle(color: Colors.white))),
                                     body: Center(
                                       child: InteractiveViewer(
-                                        child: Image.network(fileUrl, errorBuilder: (_, __, ___) => const Icon(Icons.insert_drive_file, color: Colors.white54, size: 64)),
+                                        child: NodeImage(fileUrl, errorBuilder: (_, __, ___) => const Icon(Icons.insert_drive_file, color: Colors.white54, size: 64)),
                                       ),
                                     ),
                                   ),
@@ -776,7 +777,7 @@ class _MobileSystemFolderScreenState extends State<MobileSystemFolderScreen> {
                                     child: thumbUrl.isNotEmpty
                                         ? ClipRRect(
                                             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                            child: Image.network(
+                                            child: NodeImage(
                                               thumbUrl,
                                               fit: BoxFit.cover,
                                               errorBuilder: (_, __, ___) => Icon(

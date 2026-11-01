@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class TrustMeService {
   static TrustMeService? _instance;
@@ -54,7 +55,7 @@ class TrustMeService {
 
   Future<Map<String, dynamic>> generateHandshakeCode(String targetUsername) async {
     if (_gatewayUrl.isEmpty) throw Exception("Gateway URL not set!");
-    final response = await http.post(
+    final response = await nodeHttp.post(
       Uri.parse('$_gatewayUrl/internal/handshake/generate'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'target_username': targetUsername}),
@@ -147,7 +148,7 @@ class TrustMeService {
   }
 
   Future<void> _finaliseConnectionLocally({required String counterpartGId, required String counterpartUsername, required String counterpartUrl, required String identityKey, required String signedPreKey, required int signedPreKeyId}) async {
-    final response = await http.post(
+    final response = await nodeHttp.post(
       Uri.parse('$_gatewayUrl/internal/finalise_connection'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({ 'counterpart_guptik_id': counterpartGId, 'counterpart_username': counterpartUsername, 'counterpart_url': counterpartUrl, 'contact_identity_pubkey': identityKey, 'contact_signed_prekey': signedPreKey, 'contact_signed_prekey_id': signedPreKeyId }),
@@ -163,7 +164,7 @@ class TrustMeService {
 Future<List<ConversationSummary>> getConversations() async {
     if (_gatewayUrl.isEmpty) return [];
     
-    final response = await http.get(Uri.parse('$_gatewayUrl/internal/conversations'));
+    final response = await nodeHttp.get(Uri.parse('$_gatewayUrl/internal/conversations'));
     
     if (response.statusCode == 404) return [];
     if (response.statusCode != 200) throw Exception("Server returned status ${response.statusCode}");
@@ -182,7 +183,7 @@ Future<List<ConversationSummary>> getConversations() async {
   Future<Map<String, dynamic>> sendMessage({required String conversationId, required String content, String contentType = 'text'}) async {
     final myUserId = Supabase.instance.client.auth.currentUser?.id ?? 'unknown_user';
     final myUsername = await const FlutterSecureStorage().read(key: 'current_username') ?? 'Me';
-    final response = await http.post(
+    final response = await nodeHttp.post(
       Uri.parse('$_gatewayUrl/internal/message/send'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'conversation_id': conversationId, 'content': content, 'content_type': contentType, 'sender_id': myUserId, 'sender_username': myUsername}),
@@ -193,7 +194,7 @@ Future<List<ConversationSummary>> getConversations() async {
   Future<List<Map<String, dynamic>>> getMessages(String conversationId) async {
     if (_gatewayUrl.isEmpty) return [];
     try {
-      final response = await http.get(Uri.parse('$_gatewayUrl/internal/messages/$conversationId'));
+      final response = await nodeHttp.get(Uri.parse('$_gatewayUrl/internal/messages/$conversationId'));
       if (response.statusCode != 200 || response.body.isEmpty) return [];
       final data = jsonDecode(response.body);
       if (data == null || data['messages'] == null) return [];
@@ -206,7 +207,7 @@ Future<List<ConversationSummary>> getConversations() async {
     try {
       final myUserId = Supabase.instance.client.auth.currentUser?.id ?? 'unknown_user';
       
-      await http.post(
+      await nodeHttp.post(
         Uri.parse('$_gatewayUrl/internal/conversation/$conversationId/read'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': myUserId}),
@@ -231,7 +232,7 @@ Future<List<ConversationSummary>> getConversations() async {
     request.contentLength = await file.length();
     
     file.openRead().listen(request.sink.add, onDone: request.sink.close, onError: request.sink.addError);
-    final response = await request.send();
+    final response = await nodeHttp.send(request);
     final responseBody = await response.stream.bytesToString();
     if (response.statusCode != 200) throw Exception("Stream Upload Failed: $responseBody");
     return jsonDecode(responseBody) as Map<String, dynamic>;
@@ -240,7 +241,7 @@ Future<List<ConversationSummary>> getConversations() async {
   Future<Map<String, dynamic>?> getContactForConversation(String conversationId) async {
     if (_gatewayUrl.isEmpty) return null;
     try {
-      final res = await http.get(Uri.parse('$_gatewayUrl/internal/conversation/$conversationId/contact'));
+      final res = await nodeHttp.get(Uri.parse('$_gatewayUrl/internal/conversation/$conversationId/contact'));
       if (res.statusCode == 200) return jsonDecode(res.body);
     } catch (_) {}
     return null;
@@ -249,7 +250,7 @@ Future<List<ConversationSummary>> getConversations() async {
   Future<bool> renameContact({required String conversationId, required String customName}) async {
     if (_gatewayUrl.isEmpty) return false;
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_gatewayUrl/internal/contact/rename'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -267,7 +268,7 @@ Future<List<ConversationSummary>> getConversations() async {
   Future<bool> editMessage({required String conversationId, required String messageId, required String newContent}) async {
     if (_gatewayUrl.isEmpty) return false;
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_gatewayUrl/internal/message/edit'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'conversation_id': conversationId, 'message_id': messageId, 'new_content': newContent}),
@@ -282,7 +283,7 @@ Future<List<ConversationSummary>> getConversations() async {
   Future<bool> deleteMessage({required String conversationId, required String messageId, required bool forEveryone}) async {
     if (_gatewayUrl.isEmpty) return false;
     try {
-      final response = await http.post(
+      final response = await nodeHttp.post(
         Uri.parse('$_gatewayUrl/internal/message/delete'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'conversation_id': conversationId, 'message_id': messageId, 'for_everyone': forEveryone}),

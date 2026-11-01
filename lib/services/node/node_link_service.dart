@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/node/node_auth.dart';
 
 class LinkedNode {
   final String deviceId;
@@ -47,6 +48,9 @@ class NodeLinkService {
         try {
           ts = DateTime.tryParse(r['last_active_at']?.toString() ?? '');
         } catch (_) {}
+        if (r['device_id']?.toString() == NodeAuth.instance.paired?.nodeId && url.isNotEmpty) {
+          NodeAuth.instance.trustOrigin(url);
+        }
         out.add(LinkedNode(
           deviceId: r['device_id']?.toString() ?? '',
           model: r['device_model']?.toString() ?? 'Desktop',

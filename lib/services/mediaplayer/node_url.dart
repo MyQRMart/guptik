@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/services/node/node_auth.dart';
 
 /// Sanitizes and resolves GupTik media-node URLs.
 /// Same-account desktop_devices + mp_channels. Empty = unknown (UI must say so).
@@ -62,11 +63,15 @@ class NodeUrl {
     try {
       final devices = await Supabase.instance.client
           .from('desktop_devices')
-          .select('public_url, last_active_at')
+          .select('device_id, public_url, last_active_at')
           .eq('user_id', user.id)
           .timeout(const Duration(seconds: 6));
       for (final r in (devices as List)) {
         add(r['public_url']?.toString());
+        // Only the PC we paired with may receive our pairing token.
+        if (r['device_id']?.toString() == NodeAuth.instance.paired?.nodeId) {
+          NodeAuth.instance.trustOrigin(sanitize(r['public_url']?.toString()));
+        }
       }
     } catch (e) {
       debugPrint('NodeUrl devices: $e');
@@ -91,6 +96,14 @@ class NodeUrl {
 
   /// This user's node. Pings candidates; falls back to first URL if none answer.
   static Future<String?> resolveMine() async {
+    // A paired PC wins: its token is only ever sent to these origins.
+    final paired = NodeAuth.instance.paired;
+    if (paired != null) {
+      for (final raw in [paired.tunnelUrl, paired.lanUrl]) {
+        final u = sanitize(raw);
+        if (u.isNotEmpty && await alive(u)) return u;
+      }
+    }
     final urls = await candidates();
     if (urls.isEmpty) return null;
     for (final u in urls) {

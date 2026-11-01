@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:guptik/services/guptik/mobile_ollama_service.dart';
 import 'package:guptik/utils/theme/dynamic_app_background.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 const Color _ancientGold = Color(0xFFD4AF37);
 const Color _darkBg = Color(0xFF0A0A0A);
@@ -112,7 +112,7 @@ class _GuptikScreenState extends State<GuptikScreen> {
 
   Future<void> _loadSessions() async {
     try {
-      final response = await http.get(
+      final response = await nodeHttp.get(
         Uri.parse('${widget.tunnelUrl}/api/sessions'),
       );
       if (response.statusCode == 200) {
@@ -131,7 +131,7 @@ class _GuptikScreenState extends State<GuptikScreen> {
   Future<void> _loadHistory(String sessionId) async {
     setState(() => _isLoadingHistory = true);
     try {
-      final response = await http.get(
+      final response = await nodeHttp.get(
         Uri.parse('${widget.tunnelUrl}/api/history/$sessionId'),
       );
       if (response.statusCode == 200) {
@@ -156,7 +156,7 @@ class _GuptikScreenState extends State<GuptikScreen> {
 
   Future<void> _saveMessageToDesktop(String role, String content) async {
     try {
-      await http.post(
+      await nodeHttp.post(
         Uri.parse('${widget.tunnelUrl}/api/chat/save'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({

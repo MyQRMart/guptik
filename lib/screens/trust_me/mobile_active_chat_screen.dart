@@ -7,11 +7,12 @@ import 'package:flutter/services.dart'; // 🚀 ADDED: Required for Clipboard (C
 import 'package:supabase_flutter/supabase_flutter.dart'; 
 import 'package:image_picker/image_picker.dart'; 
 import 'package:video_player/video_player.dart'; 
-import 'package:http/http.dart' as http; 
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart'; 
 import '../../services/trustme/trust_me_service.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart'; 
 import 'package:guptik/utils/theme/dynamic_app_background.dart';
+import 'package:guptik/services/node/node_http.dart';
+import 'package:guptik/widgets/node_image.dart';
 
 // Ancient Gold Theme Constants
 const Color _ancientGold = Color(0xFFD4AF37);
@@ -100,7 +101,7 @@ class _MobileActiveChatScreenState extends State<MobileActiveChatScreen> {
         url = NodeUrl.sanitize(url);
         if (url.isNotEmpty) _peerUrl = url;
         if (!url.startsWith('http')) url = 'https://$url';
-        final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
+        final res = await nodeHttp.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
         if (mounted) setState(() => widget.chat.isOnline = (res.statusCode == 200));
       }
     } catch (e) {
@@ -706,7 +707,7 @@ class _MobileActiveChatScreenState extends State<MobileActiveChatScreen> {
   Widget _buildImageContent(Map<String, dynamic> msg, String ipBase) {
     final url = msg['content'].toString().replaceFirst('[media]', ipBase).replaceFirst('[vault]', ipBase);
     return GestureDetector(
-      onTap: () => showDialog(context: context, builder: (_) => Dialog(backgroundColor: Colors.transparent, child: InteractiveViewer(child: Image.network(url)))),
+      onTap: () => showDialog(context: context, builder: (_) => Dialog(backgroundColor: Colors.transparent, child: InteractiveViewer(child: NodeImage(url)))),
       child: Column(
         children: [
           Container(
@@ -714,7 +715,7 @@ class _MobileActiveChatScreenState extends State<MobileActiveChatScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: _ancientGold.withValues(alpha: 0.5), width: 1.5),
             ),
-            child: ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, width: 260, height: 220, fit: BoxFit.cover)),
+            child: ClipRRect(borderRadius: BorderRadius.circular(14), child: NodeImage(url, width: 260, height: 220, fit: BoxFit.cover)),
           ),
           const SizedBox(height: 20), 
         ],
@@ -910,7 +911,7 @@ class _MobileVideoPlayerDialogState extends State<_MobileVideoPlayerDialog> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { 
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url), httpHeaders: NodeHttp.headersFor(widget.url))..initialize().then((_) { 
       if (mounted) setState(() => _init = true); 
       _controller.play(); 
     });

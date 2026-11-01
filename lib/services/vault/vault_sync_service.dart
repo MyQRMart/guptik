@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class VaultSyncService {
   Future<String?> getDesktopUrl() => NodeUrl.resolveMine();
@@ -22,7 +23,7 @@ class VaultSyncService {
       request.headers['Content-Type'] = 'application/octet-stream';
       request.bodyBytes = await file.readAsBytes();
 
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 5));
+      final streamedResponse = await nodeHttp.send(request).timeout(const Duration(minutes: 5));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) return true;
@@ -36,7 +37,7 @@ class VaultSyncService {
 
   Future<bool> isGatewayOnline(String baseUrl) async {
     try {
-      final response = await http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 8));
+      final response = await nodeHttp.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 8));
       return response.statusCode == 200;
     } catch (e) {
       return false;

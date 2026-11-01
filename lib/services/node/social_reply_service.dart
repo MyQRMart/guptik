@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:guptik/services/mediaplayer/node_url.dart';
+import 'package:guptik/services/node/node_http.dart';
 
 class SocialReplyService {
   Future<String> _base() async {
@@ -11,13 +11,13 @@ class SocialReplyService {
   }
 
   Future<Map<String, dynamic>> settings() async {
-    final res = await http.get(Uri.parse('${await _base()}/api/social-ai')).timeout(const Duration(seconds: 12));
+    final res = await nodeHttp.get(Uri.parse('${await _base()}/api/social-ai')).timeout(const Duration(seconds: 12));
     if (res.statusCode != 200) return {'use_local': false};
     return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
   }
 
   Future<void> setUseLocal(bool on) async {
-    final res = await http.post(
+    final res = await nodeHttp.post(
       Uri.parse('${await _base()}/api/social-ai'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'use_local': on}),
@@ -31,7 +31,7 @@ class SocialReplyService {
     required String text,
     String extraPrompt = '',
   }) async {
-    final res = await http.post(
+    final res = await nodeHttp.post(
       Uri.parse('${await _base()}/api/social-reply'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({

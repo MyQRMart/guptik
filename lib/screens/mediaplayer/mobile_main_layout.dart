@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:guptik/screens/mediaplayer/Mobile_monetization_screen.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:guptik/screens/node/pair_node_screen.dart';
+import 'package:guptik/services/node/node_auth.dart';
 
 import 'mobile_home_loader.dart';
 import 'mobile_upload_screen.dart';
@@ -29,9 +31,24 @@ class _MobileMainLayoutState extends State<MobileMainLayout> {
   String? _userChannelId;
   bool _isResolvingChannel = true;
 
+  /// Viewer ("incognito") mode: this phone is not paired with a PC, so it can watch public
+  /// videos and see basic details, but cannot upload or use the owner-only tabs.
+  bool get _viewerOnly => !NodeAuth.instance.isPaired;
+
+  void _authChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    NodeAuth.instance.removeListener(_authChanged);
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    NodeAuth.instance.addListener(_authChanged);
     _resolvedUserId = widget.currentUserUid;
     _resolveActiveUserAndChannel();
   }
@@ -120,7 +137,7 @@ class _MobileMainLayoutState extends State<MobileMainLayout> {
 
     final effectiveChannelId = _userChannelId ?? _resolvedUserId;
     final sanitizedNodeUrl = _getSanitizedGatewayUrl();
-    if (sanitizedNodeUrl.isEmpty) {
+    if (sanitizedNodeUrl.isEmpty && !_viewerOnly) {
       return Scaffold(
         backgroundColor: Colors.black,
         body: Center(
@@ -141,13 +158,22 @@ class _MobileMainLayoutState extends State<MobileMainLayout> {
       // actually selected, so playback only starts when the user taps the
       // Shots icon and stops the instant they switch away.
       MobileReelsScreen(gatewayUrl: sanitizedNodeUrl, isVisible: _currentIndex == 1),
-      MobileUploadScreen(gatewayUrl: sanitizedNodeUrl),
-      MobileProfileScreen(
-        key: ValueKey(effectiveChannelId), 
-        channelId: effectiveChannelId, 
-        nodeUrl: sanitizedNodeUrl,
-      ),
-      MobileMonetizationScreen(channelId: effectiveChannelId), 
+      if (_viewerOnly)
+        const _PairPrompt(what: 'upload videos')
+      else
+        MobileUploadScreen(gatewayUrl: sanitizedNodeUrl),
+      if (_viewerOnly)
+        const _PairPrompt(what: 'see your channel')
+      else
+        MobileProfileScreen(
+          key: ValueKey(effectiveChannelId),
+          channelId: effectiveChannelId,
+          nodeUrl: sanitizedNodeUrl,
+        ),
+      if (_viewerOnly)
+        const _PairPrompt(what: 'see your earnings')
+      else
+        MobileMonetizationScreen(channelId: effectiveChannelId),
     ];
 
     return Scaffold(
@@ -247,3 +273,39 @@ class _MobileMainLayoutState extends State<MobileMainLayout> {
   }
 }
 
+
+/// Shown in place of owner-only tabs while the phone is not paired with a PC.
+class _PairPrompt extends StatelessWidget {
+  const _PairPrompt({required this.what});
+  final String what;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline, color: Colors.orange, size: 48),
+              const SizedBox(height: 12),
+              Text('Pair your PC to $what',
+                  textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              const Text('You are watching as a viewer: public videos and basic details only.',
+                  textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PairNodeScreen())),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text('Pair with PC', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
