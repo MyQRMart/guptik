@@ -3,6 +3,8 @@ import 'package:guptik/models/mediaplyer/player_video_model.dart';
 import 'package:guptik/services/mediaplayer/mobile_bridge_service.dart';
 import 'package:guptik/services/mediaplayer/node_url.dart';
 import 'package:guptik/widgets/mediaplayer/mobile_video_player_widget.dart';
+import 'package:guptik/services/mediaplayer/local_media_history_service.dart';
+import 'mobile_local_history_screen.dart';
 
 /// History / Watch Later / Playlists / Drafts — from THIS user's node.
 class MobileLibraryScreen extends StatefulWidget {
@@ -58,6 +60,16 @@ class _MobileLibraryScreenState extends State<MobileLibraryScreen> {
       setState(() => _loading = false);
     } catch (_) {
       if (!mounted) return;
+      // Node unreachable: fall back to the history kept on this phone.
+      if (widget.mode == 'history') {
+        final local = await LocalMediaHistoryService.instance.getAll();
+        if (!mounted) return;
+        setState(() {
+          _videos = local.map((r) => r.toPlayerVideo()).toList();
+          _loading = false;
+        });
+        return;
+      }
       setState(() {
         _error = 'Could not reach your node.';
         _loading = false;
@@ -86,6 +98,17 @@ class _MobileLibraryScreenState extends State<MobileLibraryScreen> {
         backgroundColor: Colors.black,
         title: Text(_title, style: const TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          if (widget.mode == 'history')
+            IconButton(
+              tooltip: 'History on this phone',
+              icon: const Icon(Icons.phone_android, color: Colors.white),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MobileLocalHistoryScreen()),
+              ),
+            ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
